@@ -1,0 +1,50 @@
+options:
+  mapleader: ' '
+  maplocalleader: ' '
+  tabstop: 2
+  softtabstop: 2
+  shiftwidth: 2
+  !wrap
+  autoindent
+  hlsearch
+  incsearch
+  smartcase
+
+colorscheme: olivetone
+
+ft-autocmds:
+  markdown:
+    options:
+      tabstop: 2
+      softtabstop: 2
+      shiftwidth: 2
+  python:
+    options:
+      tabstop: 4
+      softtabstop: 4
+      shiftwidth: 4
+
+commands:
+  RunProgram:
+    cmd: lua require('setups').run_program()
+  LaunchInBrowser:
+    cmd: lua require('setups').launch_in_browser()
+
+keybinds:
+  <leader>ff:
+    modes: nv
+    cmd: Telescope find_files
+  <leader>fg:
+    modes: nv
+    cmd: Telescope live_grep
+  <leader>ss:
+    modes: n
+    cmd: Telescope buffers
+  <leader>rr:
+    modes: n
+    cmd: RunProgram
+  ^b:
+    modes: n
+    cmd: LaunchInBrowser
+  ^j:
+    cmd: FTermToggle

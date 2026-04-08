@@ -2,6 +2,7 @@ local M = {}
 
 local state = {
     theme = nil,
+    preview = nil,
 }
 
 local function clamp(value, min_value, max_value)
@@ -348,6 +349,353 @@ function M.update_highlight()
     end
 end
 
+local function normalize_family_name(name)
+    local normalized = (name or "template"):lower():gsub("%-", "_"):gsub("%s+", "_")
+    if normalized == "" then
+	return "template"
+    end
+    if not normalized:match("^[%a_][%w_]*$") then
+	error(("Invalid theme family '%s'"):format(name), 2)
+    end
+    return normalized
+end
+
+local function family_paths(family)
+    local config_root = vim.fn.stdpath("config")
+    if family == "template" then
+	return {
+	    family = family,
+	    colors_prefix = "template",
+	    palette_module = "lush_theme.template_palette",
+	    theme_module = "lush_theme.template_base",
+	    palette_path = config_root .. "/lua/lush_theme/template_palette.lua",
+	    base_path = config_root .. "/lua/lush_theme/template_base.lua",
+	}
+    end
+
+    local colors_prefix = family:gsub("_", "-")
+    return {
+	family = family,
+	colors_prefix = colors_prefix,
+	palette_module = ("lush_theme.%s_palettes"):format(family),
+	theme_module = ("lush_theme.%s_base"):format(family),
+	palette_path = config_root .. "/lua/lush_theme/" .. family .. "_palettes.lua",
+	base_path = config_root .. "/lua/lush_theme/" .. family .. "_base.lua",
+	colors_dark_path = config_root .. "/colors/" .. colors_prefix .. "-dark.lua",
+	colors_medium_path = config_root .. "/colors/" .. colors_prefix .. "-medium.lua",
+	colors_light_path = config_root .. "/colors/" .. colors_prefix .. "-light.lua",
+    }
+end
+
+local function preview_sample_lines()
+    return {
+	typescript = {
+	    "import { writeFileSync } from \"node:fs\"",
+	    "",
+	    "interface PalettePreview {",
+	    "  title: string",
+	    "  accent: string",
+	    "  enabled?: boolean",
+	    "}",
+	    "",
+	    "const paint = (preview: PalettePreview): string => {",
+	    "  if (!preview.enabled) return preview.title",
+	    "  return `${preview.title} -> ${preview.accent}`",
+	    "}",
+	    "",
+	    "class ThemeDraft {",
+	    "  constructor(private readonly mode: \"dark\" | \"medium\" | \"light\") {}",
+	    "",
+	    "  save(path: string) {",
+	    "    writeFileSync(path, paint({ title: this.mode, accent: \"#aabbcc\", enabled: true }))",
+	    "  }",
+	    "}",
+	    "",
+	    "new ThemeDraft(\"dark\").save(\"preview.txt\")",
+	},
+	markdown = {
+	    "# Theme Preview",
+	    "",
+	    "A quick reference buffer for headings, emphasis, and inline `code`.",
+	    "",
+	    "## Surface",
+	    "",
+	    "- Normal text should stay readable.",
+	    "- `Code blocks` should pick up the panel background.",
+	    "- Links, punctuation, and headings should stay distinct.",
+	    "",
+	    "### Notes",
+	    "",
+	    "> Diagnostics and UI groups are better checked in real files after the palette feels close.",
+	    "",
+	    "```lua",
+	    "local accent = \"#7ab0a6\"",
+	    "print(\"preview\", accent)",
+	    "```",
+	},
+    }
+end
+
+local function create_preview_buffer(filetype, lines, name)
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[buf].buftype = "nofile"
+    vim.bo[buf].bufhidden = "hide"
+    vim.bo[buf].swapfile = false
+    vim.bo[buf].modifiable = true
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    vim.bo[buf].modifiable = false
+    vim.bo[buf].readonly = true
+    vim.bo[buf].filetype = filetype
+    pcall(vim.api.nvim_buf_set_name, buf, name)
+    return buf
+end
+
+local function cleanup_preview()
+    local preview = state.preview
+    if not preview then
+	return
+    end
+
+    if preview.timer then
+	preview.timer:stop()
+	preview.timer:close()
+    end
+
+    if preview.augroup then
+	pcall(vim.api.nvim_del_augroup_by_id, preview.augroup)
+    end
+
+    state.preview = nil
+end
+
+local function preview_status(message, level)
+    local hl = level == vim.log.levels.ERROR and "ErrorMsg" or "ModeMsg"
+    vim.api.nvim_echo({ { message, hl } }, false, {})
+end
+
+local function load_lua_module_from_buffer(buf, path)
+    if not vim.api.nvim_buf_is_valid(buf) then
+	error("Preview palette buffer is no longer valid", 2)
+    end
+
+    local chunk_text = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
+    local chunk, err = load(chunk_text, "@" .. path, "t", setmetatable({
+	vim = vim,
+	require = require,
+	package = package,
+    }, { __index = _G }))
+
+    if not chunk then
+	error(err, 2)
+    end
+
+    local module = chunk()
+    if module == nil then
+	error(("Preview module did not return a value: %s"):format(path), 2)
+    end
+
+    return module
+end
+
+local function palette_from_preview_buffer(preview)
+    local module = load_lua_module_from_buffer(preview.palette_buf, preview.palette_path)
+    if type(module.get) == "function" then
+	return module.get(preview.variant)
+    end
+    return type(module) == "function" and module(preview.variant) or module
+end
+
+local function apply_preview(preview)
+    local runtime = require("lush_theme.runtime")
+    local ok, result = pcall(function()
+	return runtime.apply(vim.tbl_extend("force", preview.apply_opts, {
+	    palette = palette_from_preview_buffer(preview),
+	}))
+    end)
+    if ok then
+	if preview.last_error then
+	    preview_status(("Theme preview recovered: %s %s"):format(preview.family, preview.variant))
+	end
+	preview.last_error = nil
+	return result
+    end
+
+    local message = tostring(result)
+    if preview.last_error ~= message then
+	preview.last_error = message
+	preview_status("Theme preview error: " .. message, vim.log.levels.ERROR)
+    end
+    return nil
+end
+
+local function schedule_preview_apply(preview)
+    if not preview or not preview.timer then
+	return
+    end
+
+    preview.timer:stop()
+    preview.timer:start(120, 0, vim.schedule_wrap(function()
+	apply_preview(preview)
+    end))
+end
+
+local function open_preview_windows(paths)
+    local samples = preview_sample_lines()
+    if #vim.api.nvim_list_uis() == 0 then
+	vim.cmd("edit " .. vim.fn.fnameescape(paths.palette_path))
+	return vim.api.nvim_get_current_buf()
+    end
+
+    vim.cmd("tabnew")
+    vim.cmd("edit " .. vim.fn.fnameescape(paths.palette_path))
+    local palette_buf = vim.api.nvim_get_current_buf()
+    vim.bo[palette_buf].bufhidden = "hide"
+    vim.wo.number = true
+    vim.wo.relativenumber = false
+
+    vim.cmd("vsplit")
+    local ts_buf = create_preview_buffer("typescript", samples.typescript, "theme-preview://sample.ts")
+    vim.api.nvim_win_set_buf(0, ts_buf)
+    vim.wo.wrap = false
+
+    vim.cmd("split")
+    local md_buf = create_preview_buffer("markdown", samples.markdown, "theme-preview://notes.md")
+    vim.api.nvim_win_set_buf(0, md_buf)
+    vim.wo.wrap = true
+
+    vim.cmd("wincmd t")
+    vim.cmd("wincmd h")
+
+    return palette_buf
+end
+
+local function camelize(name)
+    local parts = vim.split(name, "_", { plain = true })
+    for i, part in ipairs(parts) do
+	parts[i] = part:sub(1, 1):upper() .. part:sub(2)
+    end
+    return table.concat(parts, "")
+end
+
+local function colorscheme_loader_text(family, variant)
+    local colors_prefix = family:gsub("_", "-")
+    local family_title = camelize(family)
+    local variant_title = camelize(variant)
+
+    return table.concat({
+	'require("lush_theme.runtime").setup_colorscheme({',
+	('  variant = "%s",'):format(variant),
+	('  theme_module = "lush_theme.%s_base",'):format(family),
+	('  palette_module = "lush_theme.%s_palettes",'):format(family),
+	('  colors_name = "%s-%s",'):format(colors_prefix, variant),
+	('  reload_command = "%s%sReload",'):format(family_title, variant_title),
+	"})",
+	"",
+    }, "\n")
+end
+
+local function scaffold_theme(family)
+    local paths = family_paths(family)
+    if family == "template" then
+	error("template is reserved", 2)
+    end
+
+    local targets = {
+	paths.palette_path,
+	paths.base_path,
+	paths.colors_dark_path,
+	paths.colors_medium_path,
+	paths.colors_light_path,
+    }
+
+    for _, path in ipairs(targets) do
+	if vim.fn.filereadable(path) == 1 then
+	    error(("Refusing to overwrite existing file: %s"):format(path), 2)
+	end
+    end
+
+    local template_palette = table.concat(vim.fn.readfile(family_paths("template").palette_path), "\n")
+    local template_base = table.concat(vim.fn.readfile(family_paths("template").base_path), "\n")
+
+    template_palette = template_palette
+	:gsub("Copy this file to <yourtheme>_palettes.lua and replace the sample values%.", ("Copy this file into %s_palettes.lua and replace the sample values."):format(family))
+	:gsub("Unknown template palette", ("Unknown %s palette"):format(family))
+    template_base = template_base:gsub('require%("lush_theme%.template_palette"%)', ('require("lush_theme.%s_palettes")'):format(family))
+
+    vim.fn.writefile(vim.split(template_palette, "\n", { plain = true }), paths.palette_path)
+    vim.fn.writefile(vim.split(template_base, "\n", { plain = true }), paths.base_path)
+    vim.fn.writefile(vim.split(colorscheme_loader_text(family, "dark"), "\n", { plain = true }), paths.colors_dark_path)
+    vim.fn.writefile(vim.split(colorscheme_loader_text(family, "medium"), "\n", { plain = true }), paths.colors_medium_path)
+    vim.fn.writefile(vim.split(colorscheme_loader_text(family, "light"), "\n", { plain = true }), paths.colors_light_path)
+
+    return paths
+end
+
+function M.theme_palette_preview(args)
+    local family = normalize_family_name(args.fargs[1] or "template")
+    local variant = args.fargs[2] or "dark"
+    local paths = family_paths(family)
+
+    if vim.fn.filereadable(paths.palette_path) ~= 1 then
+	vim.notify(("Palette file not found: %s"):format(paths.palette_path), vim.log.levels.ERROR)
+	return
+    end
+
+    cleanup_preview()
+
+    local palette_buf = open_preview_windows(paths)
+    local preview = {
+	family = family,
+	variant = variant,
+	augroup = vim.api.nvim_create_augroup("ThemePalettePreview", { clear = true }),
+	timer = vim.uv.new_timer(),
+	palette_buf = palette_buf,
+	palette_path = paths.palette_path,
+	apply_opts = {
+	    variant = variant,
+	    theme_module = paths.theme_module,
+	    palette_module = paths.palette_module,
+	    colors_name = ("%s-%s-preview"):format(paths.colors_prefix, variant),
+	    extra_modules = {
+		paths.theme_module,
+		paths.palette_module,
+	    },
+	},
+    }
+    state.preview = preview
+
+    vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "BufWritePost" }, {
+	group = preview.augroup,
+	buffer = palette_buf,
+	callback = function()
+	    schedule_preview_apply(preview)
+	end,
+    })
+
+    vim.api.nvim_create_autocmd("BufHidden", {
+	group = preview.augroup,
+	buffer = palette_buf,
+	once = true,
+	callback = function()
+	    cleanup_preview()
+	end,
+    })
+
+    apply_preview(preview)
+    vim.notify(("Theme preview: editing %s (%s)"):format(paths.palette_module, variant), vim.log.levels.INFO)
+end
+
+function M.theme_scaffold(args)
+    local family = normalize_family_name(args.args)
+    local ok, paths = pcall(scaffold_theme, family)
+    if not ok then
+	vim.notify(paths, vim.log.levels.ERROR)
+	return
+    end
+
+    vim.notify(("Scaffolded %s. Run :ThemePalettePreview %s dark to start tuning it."):format(paths.colors_prefix, family), vim.log.levels.INFO)
+end
+
 function M.setup()
     vim.api.nvim_create_user_command("InitTheme", function(opts)
 	M.init_theme(opts.args)
@@ -356,6 +704,14 @@ function M.setup()
     vim.api.nvim_create_user_command("UpdateHighlight", function()
 	M.update_highlight()
     end, { nargs = 0 })
+
+    vim.api.nvim_create_user_command("ThemePalettePreview", function(opts)
+	M.theme_palette_preview(opts)
+    end, { nargs = "*" })
+
+    vim.api.nvim_create_user_command("ThemeScaffold", function(opts)
+	M.theme_scaffold(opts)
+    end, { nargs = 1 })
 end
 
 return M

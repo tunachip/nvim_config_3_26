@@ -10,7 +10,7 @@ options:
   incsearch
   smartcase
 
-colorscheme: olivetone
+colorscheme: olivetone-dark
 
 ft-autocmds:
   markdown:

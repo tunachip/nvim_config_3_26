@@ -2946,7 +2946,7 @@ function M.lsp()
 		source = "if_many",
 		severity = { min = vim.diagnostic.severity.WARN },
 	}
-	local olivetone_virtual_lines_enabled = true
+	local olivetone_virtual_lines_enabled = false
 
 	local function refresh_visible_diagnostics()
 		for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
@@ -2969,7 +2969,7 @@ function M.lsp()
 	vim.diagnostic.config({
 		virtual_text = false,
 		virtual_lines = false,
-		olivetone_virtual_lines = olivetone_virtual_lines_opts,
+		olivetone_virtual_lines = olivetone_virtual_lines_enabled and olivetone_virtual_lines_opts or false,
 		signs = {
 			text = {
 				[vim.diagnostic.severity.ERROR] = "E",

@@ -11,8 +11,10 @@ options:
   hlsearch
   incsearch
   smartcase
+  inccommand: split
+  !showmode
 
-colorscheme: olivetone-dark
+# colorscheme: olivetone-dark
 
 ft-autocmds:
   markdown:
@@ -20,13 +22,13 @@ ft-autocmds:
       tabstop: 2
       softtabstop: 2
       shiftwidth: 2
-    colorscheme: naysayer
+   #  colorscheme: naysayer
   org:
     options:
       tabstop: 2
       softtabstop: 2
       shiftwidth: 2
-    colorscheme: naysayer
+    # colorscheme: naysayer
   python:
     options:
       tabstop: 4

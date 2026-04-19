@@ -1,4 +1,89 @@
 require('lazy').setup({
+	{ -- Modes
+		"mvllow/modes.nvim",
+		tag = "v0.2.1",
+		config = function()
+			local function hl_hex(group, key)
+				local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = group, link = false })
+				local value = ok and hl and hl[key]
+				if type(value) ~= "number" then
+					return nil
+				end
+				return string.format("#%06x", value)
+			end
+
+			local modes = require("modes")
+			local mode_utils = require("modes.utils")
+			local mode_colors = {
+				copy = "#f5c359",
+				delete = "#c75c6a",
+				insert = "#78ccc5",
+				visual = "#9745be",
+			}
+			local line_opacity = {
+				copy = 0.15,
+				delete = 0.15,
+				insert = 0.15,
+				visual = 1,
+			}
+
+			local function set_hl(name, spec)
+				vim.api.nvim_set_hl(0, name, spec)
+			end
+
+			local function refresh_modes_highlights()
+				mode_colors.visual = hl_hex("Visual", "bg") or hl_hex("Comment", "fg") or "#9745be"
+				local normal_bg = hl_hex("Normal", "bg") or "#000000"
+				local blended = {
+					copy = mode_utils.blend(mode_colors.copy, normal_bg, line_opacity.copy),
+					delete = mode_utils.blend(mode_colors.delete, normal_bg, line_opacity.delete),
+					insert = mode_utils.blend(mode_colors.insert, normal_bg, line_opacity.insert),
+					visual = mode_utils.blend(mode_colors.visual, normal_bg, line_opacity.visual),
+				}
+
+				set_hl("ModesCopy", { bg = mode_colors.copy })
+				set_hl("ModesDelete", { bg = mode_colors.delete })
+				set_hl("ModesInsert", { bg = mode_colors.insert })
+				set_hl("ModesVisual", { bg = mode_colors.visual })
+
+				set_hl("ModesCopyCursorLine", { bg = blended.copy })
+				set_hl("ModesCopyCursorLineNr", { bg = blended.copy })
+				set_hl("ModesCopyCursorLineSign", { bg = blended.copy })
+				set_hl("ModesCopyCursorLineFold", { bg = blended.copy })
+
+				set_hl("ModesDeleteCursorLine", { bg = blended.delete })
+				set_hl("ModesDeleteCursorLineNr", { bg = blended.delete })
+				set_hl("ModesDeleteCursorLineSign", { bg = blended.delete })
+				set_hl("ModesDeleteCursorLineFold", { bg = blended.delete })
+
+				set_hl("ModesInsertCursorLine", { bg = blended.insert })
+				set_hl("ModesInsertCursorLineNr", { bg = blended.insert })
+				set_hl("ModesInsertCursorLineSign", { bg = blended.insert })
+				set_hl("ModesInsertCursorLineFold", { bg = blended.insert })
+
+				set_hl("ModesVisualCursorLine", { bg = blended.visual })
+				set_hl("ModesVisualCursorLineNr", { bg = blended.visual })
+				set_hl("ModesVisualCursorLineSign", { bg = blended.visual })
+				set_hl("ModesVisualCursorLineFold", { bg = blended.visual })
+				set_hl("ModesVisualVisual", { bg = blended.visual })
+
+				set_hl("ModesInsertModeMsg", { fg = mode_colors.insert })
+				set_hl("ModesVisualModeMsg", { fg = mode_colors.visual })
+			end
+
+			modes.setup({
+				colors = mode_colors,
+				line_opacity = line_opacity,
+			})
+
+			vim.schedule(refresh_modes_highlights)
+			vim.api.nvim_create_autocmd({ "ColorScheme", "BufEnter", "VimEnter" }, {
+				group = vim.api.nvim_create_augroup("ModesRefreshAfterColorscheme", { clear = true }),
+				callback = vim.schedule_wrap(refresh_modes_highlights),
+				desc = "Rebuild modes.nvim highlights after runtime colorscheme resets",
+			})
+		end
+	},
 
 	{ -- OrgMode
 		'nvim-orgmode/orgmode',

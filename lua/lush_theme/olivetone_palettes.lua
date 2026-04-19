@@ -5,8 +5,9 @@ local palettes = {
     background = "dark",
     fg = "#f0ead6",
     bg = "#000000",
+    numberline_bg = "#181818",
     panel_bg = "#181818",
-    panel_alt_bg = "#333b0f",
+    panel_alt_bg = "#181818",
     muted_fg = "#525252",
     selection_bg = "#440044",
     title_fg = "#6b8e23",
@@ -37,8 +38,9 @@ local palettes = {
     background = "dark",
     fg = "#f2ead5",
     bg = "#19160a",
+    numberline_bg = "#3a3526",
     panel_bg = "#3a3526",
-    panel_alt_bg = "#4a432a",
+    panel_alt_bg = "#3a3526",
     muted_fg = "#8b846f",
     selection_bg = "#6c4c63",
     title_fg = "#88a63b",
@@ -69,8 +71,9 @@ local palettes = {
     background = "light",
     fg = "#2c281b",
     bg = "#f5f1df",
+    numberline_bg = "#e7dec2",
     panel_bg = "#e7dec2",
-    panel_alt_bg = "#d9cfac",
+    panel_alt_bg = "#e7dec2",
     muted_fg = "#7a725f",
     selection_bg = "#d9bfd1",
     title_fg = "#55701b",
@@ -99,12 +102,47 @@ local palettes = {
   },
 }
 
+local settings = {
+  dark = {
+    variant = "dark",
+    theme_module = "lush_theme.olivetone_base",
+    palette_module = "lush_theme.olivetone_palettes",
+    colors_name = "olivetone-dark",
+    reload_command = "OliveToneDarkReload",
+    extra_modules = { "lush_theme.olivetone_dark" },
+  },
+  medium = {
+    variant = "medium",
+    theme_module = "lush_theme.olivetone_base",
+    palette_module = "lush_theme.olivetone_palettes",
+    colors_name = "olivetone-medium",
+    reload_command = "OliveToneMediumReload",
+    extra_modules = { "lush_theme.olivetone_medium" },
+  },
+  light = {
+    variant = "light",
+    theme_module = "lush_theme.olivetone_base",
+    palette_module = "lush_theme.olivetone_palettes",
+    colors_name = "olivetone-light",
+    reload_command = "OliveToneLightReload",
+    extra_modules = { "lush_theme.olivetone_light" },
+  },
+}
+
 function M.get(variant)
   local palette = palettes[variant]
   if not palette then
     error(("Unknown olivetone palette: %s"):format(tostring(variant)), 2)
   end
   return vim.deepcopy(palette)
+end
+
+function M.get_settings(variant)
+  local palette_settings = settings[variant]
+  if not palette_settings then
+    error(("Unknown olivetone settings: %s"):format(tostring(variant)), 2)
+  end
+  return vim.deepcopy(palette_settings)
 end
 
 return M

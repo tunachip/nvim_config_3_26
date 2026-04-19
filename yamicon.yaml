@@ -4,6 +4,8 @@ options:
   tabstop: 2
   softtabstop: 2
   shiftwidth: 2
+  relativenumber
+  cursorline
   !wrap
   autoindent
   hlsearch
@@ -18,7 +20,19 @@ ft-autocmds:
       tabstop: 2
       softtabstop: 2
       shiftwidth: 2
+    colorscheme: naysayer
+  org:
+    options:
+      tabstop: 2
+      softtabstop: 2
+      shiftwidth: 2
+    colorscheme: naysayer
   python:
+    options:
+      tabstop: 4
+      softtabstop: 4
+      shiftwidth: 4
+  rust:
     options:
       tabstop: 4
       softtabstop: 4

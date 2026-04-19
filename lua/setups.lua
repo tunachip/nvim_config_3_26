@@ -6,8 +6,12 @@ local markdown_preview_pairs = {}
 local cmp_autocomplete_enabled = false
 local bitops = bit or bit32
 local run_program_session = nil
-local run_program_tempfile = {
-	prompt_on_delete = false,
+local run_program_tempfile = { prompt_on_delete = false, }
+local external_review_sessions = {}
+
+M.external_file_review = {
+	auto_open = true,
+	comment_mode = true,
 }
 
 local function blend_rgb(color, target, factor)
@@ -54,8 +58,9 @@ local function apply_cmp_highlights()
 	})
 end
 
-local function get_single_line_comment_prefix()
-	local comments = vim.bo.comments or ""
+local function get_single_line_comment_prefix_for_buffer(bufnr)
+	bufnr = bufnr or 0
+	local comments = vim.bo[bufnr].comments or ""
 
 	for part in comments:gmatch("[^,]+") do
 		local prefix = part:match("^b:(.+)$")
@@ -69,7 +74,7 @@ local function get_single_line_comment_prefix()
 		end
 	end
 
-	local commentstring = vim.bo.commentstring or ""
+	local commentstring = vim.bo[bufnr].commentstring or ""
 	local prefix = commentstring:match("^(.*)%%s")
 	if prefix then
 		prefix = vim.trim(prefix):gsub("\\", "")
@@ -79,6 +84,10 @@ local function get_single_line_comment_prefix()
 	end
 
 	return "#"
+end
+
+local function get_single_line_comment_prefix()
+	return get_single_line_comment_prefix_for_buffer(0)
 end
 
 local function format_header_comment(text)
@@ -131,6 +140,400 @@ end
 local function is_todo_markdown_buffer(bufnr)
 	local name = vim.api.nvim_buf_get_name(bufnr)
 	return name ~= "" and vim.fs.basename(name) == "todo.md"
+end
+
+local function is_normal_file_buffer(bufnr)
+	bufnr = bufnr or 0
+	if not vim.api.nvim_buf_is_valid(bufnr) then
+		return false
+	end
+
+	if vim.bo[bufnr].buftype ~= "" then
+		return false
+	end
+
+	local name = vim.api.nvim_buf_get_name(bufnr)
+	return name ~= ""
+end
+
+local function get_disk_file_stat(bufnr)
+	bufnr = bufnr or 0
+	if not is_normal_file_buffer(bufnr) then
+		return nil
+	end
+
+	local name = vim.api.nvim_buf_get_name(bufnr)
+	return vim.uv.fs_stat(name)
+end
+
+local function mark_external_change(bufnr)
+	bufnr = bufnr or 0
+	if not vim.api.nvim_buf_is_valid(bufnr) then
+		return false
+	end
+
+	local stat = get_disk_file_stat(bufnr)
+	local mtime = stat and stat.mtime and stat.mtime.sec or nil
+	local is_new_change = (not vim.b[bufnr].external_change_pending) or vim.b[bufnr].external_change_mtime ~= mtime
+	if vim.b[bufnr].external_change_rejected_mtime ~= nil and vim.b[bufnr].external_change_rejected_mtime ~= mtime then
+		vim.b[bufnr].external_change_rejected_mtime = nil
+	end
+	vim.b[bufnr].external_change_pending = true
+	vim.b[bufnr].external_change_mtime = mtime
+	return is_new_change
+end
+
+local function clear_external_change(bufnr)
+	bufnr = bufnr or 0
+	if not vim.api.nvim_buf_is_valid(bufnr) then
+		return
+	end
+
+	vim.b[bufnr].external_change_pending = false
+	vim.b[bufnr].external_change_mtime = nil
+end
+
+local function mark_external_change_rejected(bufnr)
+	bufnr = bufnr or 0
+	if not vim.api.nvim_buf_is_valid(bufnr) then
+		return
+	end
+
+	vim.b[bufnr].external_change_rejected_mtime = vim.b[bufnr].external_change_mtime
+	clear_external_change(bufnr)
+end
+
+local function current_buffer_matches_disk(bufnr)
+	bufnr = bufnr or 0
+	local stat = get_disk_file_stat(bufnr)
+	if not stat or not stat.mtime then
+		return false
+	end
+
+	local recorded = vim.b[bufnr].external_change_mtime
+	if recorded == nil then
+		return false
+	end
+
+	return recorded == stat.mtime.sec
+end
+
+local function get_external_review_session(bufnr)
+	bufnr = bufnr or vim.api.nvim_get_current_buf()
+	if external_review_sessions[bufnr] then
+		return external_review_sessions[bufnr]
+	end
+
+	for source_buf, session in pairs(external_review_sessions) do
+		if session.disk_buf == bufnr then
+			return session, source_buf
+		end
+	end
+
+	return nil
+end
+
+local function buffer_in_external_review(bufnr)
+	return get_external_review_session(bufnr) ~= nil
+end
+
+local function set_review_buffer_locked(bufnr, locked)
+	if not vim.api.nvim_buf_is_valid(bufnr) then
+		return
+	end
+
+	vim.bo[bufnr].modifiable = not locked
+	vim.bo[bufnr].readonly = locked
+end
+
+local function close_external_review(source_buf)
+	local session = external_review_sessions[source_buf]
+	if not session then
+		return
+	end
+
+	if session.source_win and vim.api.nvim_win_is_valid(session.source_win) then
+		vim.api.nvim_set_current_win(session.source_win)
+	end
+
+	if vim.api.nvim_buf_is_valid(source_buf) then
+		set_review_buffer_locked(source_buf, false)
+	end
+
+	if session.source_win and vim.api.nvim_win_is_valid(session.source_win) then
+		vim.api.nvim_set_current_win(session.source_win)
+		if vim.wo.diff then
+			vim.cmd("diffoff")
+		end
+	end
+
+	if session.disk_win and vim.api.nvim_win_is_valid(session.disk_win) then
+		vim.api.nvim_set_current_win(session.disk_win)
+		if vim.wo.diff then
+			vim.cmd("diffoff")
+		end
+		vim.cmd("close")
+	end
+
+	if session.source_win and vim.api.nvim_win_is_valid(session.source_win) then
+		vim.api.nvim_set_current_win(session.source_win)
+	end
+
+	external_review_sessions[source_buf] = nil
+end
+
+local function build_comment_mode_lines(old_lines, new_lines, source_buf)
+	local prefix = get_single_line_comment_prefix_for_buffer(source_buf)
+	local old_text = table.concat(old_lines, "\n")
+	local new_text = table.concat(new_lines, "\n")
+	local hunks = vim.diff(old_text, new_text, {
+		result_type = "indices",
+		algorithm = "histogram",
+	})
+
+	local merged = {}
+	local old_index = 1
+
+	local function append_range(lines, first, last)
+		for i = first, last do
+			merged[#merged + 1] = lines[i]
+		end
+	end
+
+	local function append_commented_range(lines, first, last)
+		for i = first, last do
+			local line = lines[i]
+			if line == "" then
+				merged[#merged + 1] = prefix
+			else
+				merged[#merged + 1] = prefix .. " " .. line
+			end
+		end
+	end
+
+	for _, hunk in ipairs(hunks) do
+		local start_old, count_old, start_new, count_new = unpack(hunk)
+		append_range(old_lines, old_index, start_old - 1)
+		if count_old > 0 then
+			append_commented_range(old_lines, start_old, start_old + count_old - 1)
+		end
+		if count_new > 0 then
+			append_range(new_lines, start_new, start_new + count_new - 1)
+		end
+		old_index = start_old + count_old
+	end
+
+	append_range(old_lines, old_index, #old_lines)
+	return merged
+end
+
+local function accept_external_review(opts)
+	opts = opts or {}
+	local current_buf = opts.bufnr or vim.api.nvim_get_current_buf()
+	local session, source_buf = get_external_review_session(current_buf)
+	source_buf = source_buf or current_buf
+	if not session or not source_buf then
+		vim.notify("No external review session is active", vim.log.levels.WARN)
+		return
+	end
+
+	if not vim.api.nvim_buf_is_valid(source_buf) or not vim.api.nvim_buf_is_valid(session.disk_buf) then
+		close_external_review(source_buf)
+		vim.notify("External review session is no longer valid", vim.log.levels.WARN)
+		return
+	end
+
+	local old_lines = vim.api.nvim_buf_get_lines(source_buf, 0, -1, false)
+	local new_lines = vim.api.nvim_buf_get_lines(session.disk_buf, 0, -1, false)
+	local accepted_lines = new_lines
+	if M.external_file_review.comment_mode then
+		accepted_lines = build_comment_mode_lines(old_lines, new_lines, source_buf)
+	end
+
+	set_review_buffer_locked(source_buf, false)
+	vim.api.nvim_buf_set_lines(source_buf, 0, -1, false, accepted_lines)
+	vim.bo[source_buf].modified = true
+
+	if session.source_win and vim.api.nvim_win_is_valid(session.source_win) then
+		vim.api.nvim_set_current_win(session.source_win)
+	end
+
+	vim.cmd("silent write")
+	clear_external_change(source_buf)
+	close_external_review(source_buf)
+
+	if opts.quit then
+		vim.cmd("quit")
+	end
+	if opts.quit_all then
+		vim.cmd("qall")
+	end
+end
+
+local function reject_external_review(opts)
+	opts = opts or {}
+	local current_buf = opts.bufnr or vim.api.nvim_get_current_buf()
+	local session, source_buf = get_external_review_session(current_buf)
+	source_buf = source_buf or current_buf
+	if not session or not source_buf then
+		return
+	end
+
+	mark_external_change_rejected(source_buf)
+	close_external_review(source_buf)
+	vim.notify("Rejected external changes for the current buffer", vim.log.levels.INFO)
+end
+
+local function set_external_review_keymaps(bufnr)
+	local function map(lhs, rhs, desc)
+		vim.keymap.set("n", lhs, rhs, {
+			buffer = bufnr,
+			noremap = true,
+			silent = true,
+			nowait = true,
+			desc = desc,
+		})
+	end
+
+	map("<CR>", function()
+		accept_external_review({ bufnr = bufnr })
+	end, "Accept external changes")
+	map("<Esc>", function()
+		reject_external_review({ bufnr = bufnr })
+	end, "Reject external changes")
+	map("ZZ", function()
+		accept_external_review({ bufnr = bufnr, quit = true })
+	end, "Accept external changes")
+end
+
+local function open_external_diff(opts)
+	opts = opts or {}
+	local source_buf = opts.bufnr or vim.api.nvim_get_current_buf()
+	if external_review_sessions[source_buf] then
+		return
+	end
+
+	if not is_normal_file_buffer(source_buf) then
+		vim.notify("Current buffer is not a file-backed buffer", vim.log.levels.WARN)
+		return
+	end
+
+	local source_win = vim.fn.bufwinid(source_buf)
+	if source_win == -1 then
+		source_win = vim.api.nvim_get_current_win()
+	end
+
+	local file = vim.api.nvim_buf_get_name(source_buf)
+	local stat = vim.uv.fs_stat(file)
+	if not stat or stat.type ~= "file" then
+		vim.notify("Current file does not exist on disk", vim.log.levels.WARN)
+		return
+	end
+
+	vim.api.nvim_set_current_win(source_win)
+	vim.cmd("vertical new")
+	local disk_win = vim.api.nvim_get_current_win()
+	local disk_buf = vim.api.nvim_get_current_buf()
+	vim.bo[disk_buf].buftype = "nofile"
+	vim.bo[disk_buf].bufhidden = "wipe"
+	vim.bo[disk_buf].swapfile = false
+	vim.bo[disk_buf].modifiable = true
+	vim.bo[disk_buf].readonly = false
+	vim.api.nvim_buf_set_name(disk_buf, ("[disk] %s"):format(vim.fn.fnamemodify(file, ":t")))
+	vim.cmd("read ++edit " .. vim.fn.fnameescape(file))
+	vim.cmd("0delete _")
+	vim.bo[disk_buf].modified = false
+	vim.bo[disk_buf].filetype = vim.bo[source_buf].filetype
+	set_review_buffer_locked(disk_buf, true)
+	vim.cmd("diffthis")
+
+	vim.api.nvim_set_current_win(source_win)
+	vim.cmd("diffthis")
+	vim.wo.scrollbind = true
+	vim.wo.cursorbind = true
+	set_review_buffer_locked(source_buf, true)
+
+	external_review_sessions[source_buf] = {
+		source_buf = source_buf,
+		source_win = source_win,
+		disk_buf = disk_buf,
+		disk_win = disk_win,
+	}
+
+	set_external_review_keymaps(source_buf)
+	set_external_review_keymaps(disk_buf)
+
+	vim.notify("External review mode: <Enter> accepts, <Esc> rejects.", vim.log.levels.INFO)
+end
+
+local function reload_current_buffer_from_disk()
+	local bufnr = vim.api.nvim_get_current_buf()
+	if not is_normal_file_buffer(bufnr) then
+		vim.notify("Current buffer is not a file-backed buffer", vim.log.levels.WARN)
+		return
+	end
+
+	if vim.bo[bufnr].modified then
+		vim.notify("Buffer has unsaved edits. Review with :ExternalDiff before reloading.", vim.log.levels.WARN)
+		return
+	end
+
+	vim.cmd("checktime")
+	vim.cmd("edit!")
+	clear_external_change(bufnr)
+	vim.notify("Reloaded buffer from disk", vim.log.levels.INFO)
+end
+
+function _G.external_review_command_abbrev(cmd)
+	if vim.fn.getcmdtype() ~= ":" then
+		return cmd
+	end
+
+	local cmdline = vim.fn.getcmdline()
+	if cmdline ~= cmd then
+		return cmd
+	end
+
+	if not buffer_in_external_review(vim.api.nvim_get_current_buf()) then
+		return cmd
+	end
+
+	local replacements = {
+		w = "ExternalReviewAccept",
+		["w!"] = "ExternalReviewAccept",
+		wa = "ExternalReviewAccept",
+		["wa!"] = "ExternalReviewAccept",
+		write = "ExternalReviewAccept",
+		["write!"] = "ExternalReviewAccept",
+		wall = "ExternalReviewAccept",
+		["wall!"] = "ExternalReviewAccept",
+		update = "ExternalReviewAccept",
+		wq = "ExternalReviewAcceptQuit",
+		["wq!"] = "ExternalReviewAcceptQuit",
+		xit = "ExternalReviewAcceptQuit",
+		x = "ExternalReviewAcceptQuit",
+		["x!"] = "ExternalReviewAcceptQuit",
+		xa = "ExternalReviewAcceptQuitAll",
+		["xa!"] = "ExternalReviewAcceptQuitAll",
+		wqa = "ExternalReviewAcceptQuitAll",
+		["wqa!"] = "ExternalReviewAcceptQuitAll",
+		xall = "ExternalReviewAcceptQuitAll",
+	}
+
+	return replacements[cmd] or cmd
+end
+
+local function maybe_checktime()
+	if vim.o.autoread then
+		return
+	end
+
+	local bufnr = vim.api.nvim_get_current_buf()
+	if not is_normal_file_buffer(bufnr) then
+		return
+	end
+
+	vim.cmd("checktime")
 end
 
 local function find_todo_project_root(filepath)
@@ -1023,22 +1426,31 @@ local function run_in_terminal(run_cmd, opts)
 	if timeout and timeout > 0 then
 		launch_cmd = string.format("printf 'Closing in %ss...\\n'; %s", timeout, run_cmd)
 	else
-		launch_cmd = string.format("printf 'Press Enter or Ctrl-C to stop and close...\\n'; %s", run_cmd)
+		launch_cmd = string.format("printf 'Running... output will stay open. Press Enter, q, or Ctrl-C to close.\\n\\n'; %s", run_cmd)
 	end
 
 	local job_id = vim.fn.termopen({ shell, "-lc", launch_cmd }, {
 		on_exit = function()
-			close_session(session)
+			session.job_id = nil
+			if timeout and timeout > 0 then
+				close_session(session)
+				return
+			end
+			vim.schedule(function()
+				pcall(vim.cmd, "stopinsert")
+			end)
 		end,
 	})
 	session.job_id = job_id
 
-	local stop_keys = { "<CR>", "<C-c>", "q" }
-	for _, lhs in ipairs(stop_keys) do
-		vim.keymap.set({ "n", "t" }, lhs, function()
+	for _, lhs in ipairs({ "<CR>", "q" }) do
+		vim.keymap.set("n", lhs, function()
 			stop_session(session)
 		end, { buffer = term_buf, silent = true, nowait = true })
 	end
+	vim.keymap.set("n", "<C-c>", function()
+		stop_session(session)
+	end, { buffer = term_buf, silent = true, nowait = true })
 
 	if timeout and timeout > 0 then
 		session.timer = vim.fn.timer_start(math.floor(timeout * 1000), function()
@@ -1104,6 +1516,10 @@ local function build_run_command(filepath, search_path)
 		return run_cmd
 	end
 
+	local ft = vim.bo.filetype
+	local escaped_file = vim.fn.shellescape(filepath)
+	local run_cmd = nil
+
 	local function build_python_run_cmd()
 		local source_path = search_path or filepath
 		if filepath ~= source_path then
@@ -1139,9 +1555,13 @@ local function build_run_command(filepath, search_path)
 		return "cd " .. vim.fn.shellescape(run_root) .. " && python -m " .. module
 	end
 
-	local ft = vim.bo.filetype
-	local escaped_file = vim.fn.shellescape(filepath)
-	local run_cmd = nil
+	local function build_rust_run_cmd()
+		local compiler = vim.env.RUSTC or "rustc"
+		local stem = vim.fn.fnamemodify(filepath, ":t:r")
+		local bin = vim.fn.tempname() .. "_" .. stem
+		local escaped_bin = vim.fn.shellescape(bin)
+		return string.format("%s %s -o %s && %s; exit_code=$?; rm -f %s; exit $exit_code", compiler, escaped_file, escaped_bin, escaped_bin, escaped_bin)
+	end
 
 	if ft == "python" then
 		run_cmd = build_python_run_cmd()
@@ -1151,7 +1571,7 @@ local function build_run_command(filepath, search_path)
 		local bin = vim.fn.tempname() .. "_" .. stem
 		local escaped_bin = vim.fn.shellescape(bin)
 		local compiler = vim.env.CC or "cc"
-		run_cmd = string.format("%s %s -o %s && %s", compiler, escaped_file, escaped_bin, escaped_bin)
+		run_cmd = string.format("%s %s -o %s && %s; exit_code=$?; rm -f %s; exit $exit_code", compiler, escaped_file, escaped_bin, escaped_bin, escaped_bin)
 	end
 	if ft == "javascript" then
 		run_cmd = "node " .. escaped_file
@@ -1161,6 +1581,9 @@ local function build_run_command(filepath, search_path)
 	end
 	if ft == "lua" then
 		run_cmd = "lua " .. escaped_file
+	end
+	if ft == "rust" then
+		run_cmd = build_rust_run_cmd()
 	end
 	if ft == "sh" or ft == "bash" or ft == "zsh" then
 		run_cmd = "bash " .. escaped_file
@@ -1179,7 +1602,7 @@ local function build_run_command(filepath, search_path)
 		local bin = vim.fn.tempname() .. "_" .. stem
 		local escaped_bin = vim.fn.shellescape(bin)
 		local compiler = vim.env.CC or "cc"
-		run_cmd = string.format("%s %s -o %s && %s", compiler, escaped_file, escaped_bin, escaped_bin)
+		run_cmd = string.format("%s %s -o %s && %s; exit_code=$?; rm -f %s; exit $exit_code", compiler, escaped_file, escaped_bin, escaped_bin, escaped_bin)
 	end
 	if ext == "js" then
 		run_cmd = "node " .. escaped_file
@@ -1189,6 +1612,9 @@ local function build_run_command(filepath, search_path)
 	end
 	if ext == "lua" then
 		run_cmd = "lua " .. escaped_file
+	end
+	if ext == "rs" then
+		run_cmd = build_rust_run_cmd()
 	end
 	if ext == "sh" or ext == "bash" or ext == "zsh" then
 		run_cmd = "bash " .. escaped_file
@@ -1460,7 +1886,10 @@ end
 
 local function format_current_buffer()
 	local bufnr = vim.api.nvim_get_current_buf()
-	local clients = vim.lsp.get_clients({ bufnr = bufnr, method = "textDocument/formatting" })
+	local clients = vim.lsp.get_clients({
+	  bufnr = bufnr,
+	  method = "textDocument/formatting"
+	})
 	if not clients or #clients == 0 then
 		vim.notify("No LSP formatter attached for this buffer", vim.log.levels.WARN)
 		return
@@ -1642,6 +2071,12 @@ function M.keymaps()
 	map("n", "<leader>fi", "<cmd>FillImportSources<cr>", vim.tbl_extend("force", opts, {
 		desc = "Fill placeholder import sources",
 	}))
+	map("n", "<leader>ed", "<cmd>ExternalDiff<cr>", vim.tbl_extend("force", opts, {
+		desc = "Diff current buffer against disk",
+	}))
+	map("n", "<leader>er", "<cmd>ExternalReload<cr>", vim.tbl_extend("force", opts, {
+		desc = "Reload current buffer from disk",
+	}))
 	map("x", "<leader>rr", function()
 		M.run_program({ use_visual = true })
 	end, vim.tbl_extend("force", opts, {
@@ -1676,12 +2111,16 @@ end
 
 function M.autocmds()
 	local group = vim.api.nvim_create_augroup("file_header", { clear = true })
+	vim.o.autoread = false
+
 	vim.api.nvim_create_autocmd("BufEnter", {
 		group = group,
 		callback = function()
 			if is_empty_named_buffer() then
 				add_file_header({ silent = true })
 			end
+
+			maybe_checktime()
 		end,
 		desc = "Add file header to empty files",
 	})
@@ -1695,6 +2134,36 @@ function M.autocmds()
 	})
 	vim.api.nvim_create_user_command("FillImportSources", fill_import_sources, {
 		desc = "Resolve placeholder import sources from the current working directory",
+	})
+	vim.api.nvim_create_user_command("ExternalDiff", function()
+		open_external_diff()
+	end, {
+		desc = "Open a diff between current buffer and the on-disk file",
+	})
+	vim.api.nvim_create_user_command("ExternalReviewAccept", function()
+		accept_external_review()
+	end, {
+		desc = "Accept external changes for the active review session",
+	})
+	vim.api.nvim_create_user_command("ExternalReviewAcceptQuit", function()
+		accept_external_review({ quit = true })
+	end, {
+		desc = "Accept external changes and quit the current window",
+	})
+	vim.api.nvim_create_user_command("ExternalReviewAcceptQuitAll", function()
+		accept_external_review({ quit_all = true })
+	end, {
+		desc = "Accept external changes and quit Neovim",
+	})
+	vim.api.nvim_create_user_command("ExternalReviewReject", function()
+		reject_external_review()
+	end, {
+		desc = "Reject external changes for the active review session",
+	})
+	vim.api.nvim_create_user_command("ExternalReload", function()
+		reload_current_buffer_from_disk()
+	end, {
+		desc = "Reload current buffer from disk if it is safe to do so",
 	})
 	vim.api.nvim_create_user_command("Run", function(command_opts)
 		local timeout = nil
@@ -1718,6 +2187,78 @@ function M.autocmds()
 		end,
 		desc = "Sync project TODOs into todo.md",
 	})
+	vim.api.nvim_create_autocmd({ "FocusGained", "TermClose" }, {
+		group = group,
+		callback = maybe_checktime,
+		desc = "Check for file changes after focus returns or terminal commands finish",
+	})
+	vim.api.nvim_create_autocmd("FileChangedShell", {
+		group = group,
+		callback = function(args)
+			local bufnr = args.buf
+			if not is_normal_file_buffer(bufnr) then
+				return
+			end
+
+			vim.v.fcs_choice = ""
+			local is_new_change = mark_external_change(bufnr)
+			local rejected_mtime = vim.b[bufnr].external_change_rejected_mtime
+
+			local filename = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ":.")
+			local reason = vim.v.fcs_reason ~= "" and (" (" .. vim.v.fcs_reason .. ")") or ""
+			vim.schedule(function()
+				if not is_new_change or not vim.api.nvim_buf_is_valid(bufnr) or not current_buffer_matches_disk(bufnr) then
+					return
+				end
+
+				if rejected_mtime ~= nil and rejected_mtime == vim.b[bufnr].external_change_mtime then
+					vim.notify(
+						("External change still pending for %s%s. Re-open with :ExternalDiff if needed."):format(filename, reason),
+						vim.log.levels.INFO
+					)
+					return
+				end
+
+				if M.external_file_review.auto_open then
+					open_external_diff({ bufnr = bufnr })
+					return
+				end
+
+				vim.notify(
+					("External change detected for %s%s. Review with :ExternalDiff or <leader>ed."):format(filename, reason),
+					vim.log.levels.WARN
+				)
+			end)
+		end,
+		desc = "Detect but do not auto-reload externally changed files",
+	})
+	vim.api.nvim_create_autocmd("BufWritePost", {
+		group = group,
+		callback = function(args)
+			clear_external_change(args.buf)
+		end,
+		desc = "Clear external change marker after writing the buffer",
+	})
+
+	vim.cmd([[cnoreabbrev <expr> w v:lua.external_review_command_abbrev('w')]])
+	vim.cmd([[cnoreabbrev <expr> w! v:lua.external_review_command_abbrev('w!')]])
+	vim.cmd([[cnoreabbrev <expr> wa v:lua.external_review_command_abbrev('wa')]])
+	vim.cmd([[cnoreabbrev <expr> wa! v:lua.external_review_command_abbrev('wa!')]])
+	vim.cmd([[cnoreabbrev <expr> wall v:lua.external_review_command_abbrev('wall')]])
+	vim.cmd([[cnoreabbrev <expr> wall! v:lua.external_review_command_abbrev('wall!')]])
+	vim.cmd([[cnoreabbrev <expr> write v:lua.external_review_command_abbrev('write')]])
+	vim.cmd([[cnoreabbrev <expr> write! v:lua.external_review_command_abbrev('write!')]])
+	vim.cmd([[cnoreabbrev <expr> update v:lua.external_review_command_abbrev('update')]])
+	vim.cmd([[cnoreabbrev <expr> wq v:lua.external_review_command_abbrev('wq')]])
+	vim.cmd([[cnoreabbrev <expr> wq! v:lua.external_review_command_abbrev('wq!')]])
+	vim.cmd([[cnoreabbrev <expr> wqa v:lua.external_review_command_abbrev('wqa')]])
+	vim.cmd([[cnoreabbrev <expr> wqa! v:lua.external_review_command_abbrev('wqa!')]])
+	vim.cmd([[cnoreabbrev <expr> x v:lua.external_review_command_abbrev('x')]])
+	vim.cmd([[cnoreabbrev <expr> x! v:lua.external_review_command_abbrev('x!')]])
+	vim.cmd([[cnoreabbrev <expr> xa v:lua.external_review_command_abbrev('xa')]])
+	vim.cmd([[cnoreabbrev <expr> xa! v:lua.external_review_command_abbrev('xa!')]])
+	vim.cmd([[cnoreabbrev <expr> xit v:lua.external_review_command_abbrev('xit')]])
+	vim.cmd([[cnoreabbrev <expr> xall v:lua.external_review_command_abbrev('xall')]])
 
 	apply_cmp_highlights()
 	vim.api.nvim_create_autocmd("ColorScheme", {
@@ -1863,29 +2404,28 @@ function M.telescope()
 	if not ok then return end
 
 	local actions = require("telescope.actions")
-	local themes = require("telescope.themes")
-	local dropdown_defaults = themes.get_dropdown({
-		layout_strategy = "vertical",
-		layout_config = {
-			prompt_position = "bottom",
-			preview_cutoff = 10,
-			mirror = false,
-			height = 0.8,
-			width = 0.8,
-			vertical = { preview_height = 0.6 },
-		},
-	})
 
 	telescope.setup({
-		defaults = vim.tbl_deep_extend("force", dropdown_defaults, {
+		defaults = {
 			prompt_prefix = "   ",
 			selection_caret = " ",
 			path_display = { "smart" },
 			sorting_strategy = "ascending",
+			layout_strategy = "bottom_pane",
+			layout_config = {
+				prompt_position = "top",
+				preview_cutoff = 1,
+				height = 25,
+				bottom_pane = {
+					height = 25,
+					prompt_position = "top",
+					preview_cutoff = 1,
+				},
+			},
 			border = true,
 			borderchars = {
-				prompt = borders,
-				results = borders,
+				prompt = { "─", " ", " ", " ", "─", "─", " ", " " },
+				results = { " " },
 				preview = borders,
 			},
 			file_ignore_patterns = {},
@@ -1898,7 +2438,7 @@ function M.telescope()
 					["<C-k>"] = actions.move_selection_previous,
 				},
 			},
-		}),
+		},
 		pickers = {
 			find_files = {
 				hidden = true,
@@ -1925,6 +2465,17 @@ function M.telescope()
 	pcall(telescope.load_extension, "fzf")
 	pcall(telescope.load_extension, "live_grep_args")
 	pcall(telescope.load_extension, "symbols")
+
+	set(0, "TelescopeNormal", { link = "NormalFloat" })
+	set(0, "TelescopeBorder", { link = "FloatBorder" })
+	set(0, "TelescopePromptNormal", { link = "NormalFloat" })
+	set(0, "TelescopePromptBorder", { link = "FloatBorder" })
+	set(0, "TelescopePromptTitle", { link = "Title" })
+	set(0, "TelescopeResultsNormal", { link = "NormalFloat" })
+	set(0, "TelescopeResultsBorder", { link = "FloatBorder" })
+	set(0, "TelescopePreviewNormal", { link = "NormalFloat" })
+	set(0, "TelescopePreviewBorder", { link = "FloatBorder" })
+
 	-- Keymaps
 	local map = vim.keymap.set
 	local opts = { noremap = true, silent = true }
@@ -1974,9 +2525,37 @@ end
 
 -- Oil
 function M.oil()
-	require("oil").setup({
+	local oil = require("oil")
+	local function rebalance_windows()
+		vim.schedule(function()
+			vim.wo.winfixwidth = false
+			pcall(vim.cmd.wincmd, "=")
+		end)
+	end
+	local function current_buffer_dir()
+		local path = vim.api.nvim_buf_get_name(0)
+		if path == "" then
+			return vim.fn.getcwd()
+		end
+		return vim.fn.fnamemodify(path, ":p:h")
+	end
+
+	oil.setup({
 		default_file_explorer = true,
 		skip_confirm_for_simple_edits = true,
+		keymaps = {
+			["<CR>"] = {
+				callback = function()
+					oil.select({}, function(err)
+						if not err then
+							rebalance_windows()
+						end
+					end)
+				end,
+				desc = "Open the entry under the cursor",
+				mode = "n",
+			},
+		},
 		view_options = {
 			show_hidden = true,
 			is_always_hidden = function(name, _)
@@ -1984,10 +2563,23 @@ function M.oil()
 			end,
 		},
 		columns = { "icon" },
-		preview = { vertical = true, splits = "botright" },
 	})
-	vim.keymap.set("n", "-", require("oil").open, {
+
+	vim.keymap.set("n", "-", function()
+		oil.open()
+	end, {
 		desc = "Open parent directory"
+	})
+
+	vim.keymap.set("n", "_", function()
+		local dir = current_buffer_dir()
+		vim.cmd("topleft vsplit")
+		oil.open(dir)
+		vim.wo.winfixwidth = true
+		vim.cmd(("vertical resize %d"):format(math.max(20, math.floor(vim.o.columns * 0.25))))
+		vim.cmd.wincmd("=")
+	end, {
+		desc = "Open parent directory in a left sidebar"
 	})
 end
 
@@ -2012,6 +2604,7 @@ function M.treesitter()
 		"javascript",
 		"typescript",
 		"tsx",
+		"rust",
 	}
 
 	local installed = {}
@@ -2056,6 +2649,15 @@ function M.treesitter()
 	set(0, "@markup.raw.block.markdown", { link = "Normal" })
 end
 
+function M.orgmode_telescope()
+	require('telescope').load_extension('orgmode')
+	local ext = require('telescope').extensions.orgmode
+	vim.keymap.set('n', '<leader>fh', ext.search_headings, { desc = 'Org headlines' })
+	vim.keymap.set('n', '<leader>ft', ext.search_tags, { desc = 'Org tags' })
+	vim.keymap.set('n', '<leader>rf', ext.refile_heading, { desc = 'Org refile' })
+	vim.keymap.set('n', '<leader>li', ext.insert_link, { desc = 'Org insert link' })
+end
+
 -- LSP
 function M.lsp()
 	local servers = {
@@ -2064,6 +2666,7 @@ function M.lsp()
 		"bashls",
 		"jsonls",
 		"ts_ls",
+		"rust_analyzer",
 	}
 	local has_mason, mason = pcall(require, "mason")
 	if has_mason then mason.setup() end
@@ -2176,6 +2779,48 @@ function M.lsp()
 					includeInlayPropertyDeclarationTypeHints = true,
 					includeInlayFunctionLikeReturnTypeHints = true,
 					includeInlayEnumMemberValueHints = true,
+				},
+			},
+		},
+	})
+	vim.lsp.config("rust_analyzer", {
+		settings = {
+			["rust-analyzer"] = {
+				cargo = {
+					allFeatures = true,
+				},
+				checkOnSave = true,
+				check = {
+					command = "clippy",
+				},
+				inlayHints = {
+					bindingModeHints = {
+						enable = false,
+					},
+					closingBraceHints = {
+						enable = false,
+					},
+					closureReturnTypeHints = {
+						enable = "always",
+					},
+					discriminantHints = {
+						enable = "fieldless",
+					},
+					expressionAdjustmentHints = {
+						enable = "never",
+					},
+					lifetimeElisionHints = {
+						enable = "skip_trivial",
+						useParameterNames = true,
+					},
+					typeHints = {
+						enable = true,
+						hideClosureInitialization = false,
+						hideNamedConstructor = false,
+					},
+				},
+				procMacro = {
+					enable = true,
 				},
 			},
 		},
@@ -2337,6 +2982,50 @@ function M.lsp()
 		update_in_insert = false,
 		severity_sort = true,
 		float = { border = "rounded", source = "always", focusable = false },
+	})
+end
+
+function M.org_extensions()
+	require('orgmode').setup({
+		org_agenda_files = { '~/org/*.org' },
+		org_default_notes_file = '~/org/inbox.org',
+		ui = { input = { use_vim_ui = true, }, },
+		org_todo_keywords = { 'TODO(t)', 'NEXT(n)', 'WAITING(w)', '|', 'DONE(d)' },
+		org_log_done = 'time',
+
+		org_agenda_custom_commands = {
+			u = {
+				description = 'Unfinished tasks',
+				types = { {
+					type = 'tags_todo',
+					match = '',
+					org_agenda_overriding_header = 'Unfinished tasks',
+				} },
+			},
+			d = {
+				description = 'Completed tasks',
+				types = { {
+					type = 'tags',
+					match = 'TODO="DONE"',
+					org_agenda_overriding_header = 'Completed tasks',
+				} },
+			},
+			T = {
+				description = 'Today: agenda + unfinished',
+				types = { {
+					type = 'agenda',
+					org_agenda_span = 'day',
+					org_agenda_overriding_header = 'Today',
+				}, {
+					type = 'tags_todo',
+					match = '',
+					org_agenda_overriding_header = 'Unfinished tasks',
+				} },
+			},
+		},
+	})
+	require('org_extensions/org_daily').setup({
+		daily_file = '~/org/daily.org',
 	})
 end
 

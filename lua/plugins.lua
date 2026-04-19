@@ -1,16 +1,45 @@
 require('lazy').setup({
-	{
-		dir = vim.fn.stdpath("config") .. "/local-plugins/inactive-dimmer",
-		name = "inactive-dimmer.nvim",
-		lazy = false,
+
+	{ -- OrgMode
+		'nvim-orgmode/orgmode',
+		event = 'VeryLazy',
+		ft = { 'org ' },
 		config = function()
-			require("inactive_dimmer").setup({
-				dim_factor = 0.65,
-			})
+			vim.lsp.enable('org')
 		end,
 	},
 
-	{   -- Treesitter
+	{ -- OrgmodeTelescope
+		'nvim-orgmode/telescope-orgmode.nvim',
+		event = "VeryLazy",
+		dependencies = {
+			'nvim-orgmode/orgmode',
+			'nvim-telescope/telescope.nvim',
+		},
+		config = function()
+			require("setups").orgmode_telescope()
+		end,
+	},
+
+	{
+		"hat0uma/csvview.nvim",
+		---@module "csvview"
+		---@type CsvView.Options
+		opts = {
+			parser = { comments = { "#", "//" } },
+			keymaps = {
+				textobject_field_inner = { "if", mode = { "o", "x" } },
+				textobject_field_outer = { "af", mode = { "o", "x" } },
+				jump_next_field_end = { "<Tab>", mode = { "n", "v" } },
+				jump_prev_field_end = { "<S-Tab>", mode = { "n", "v" } },
+				jump_next_row = { "<Enter>", mode = { "n", "v" } },
+				jump_prev_row = { "<S-Enter>", mode = { "n", "v" } },
+			},
+		},
+		cmd = { "CsvViewEnable", "CsvViewDisable", "CsvViewToggle" },
+	},
+
+	{ -- Treesitter
 		"nvim-treesitter/nvim-treesitter",
 		build = ":TSUpdate",
 		lazy = false,
@@ -25,12 +54,12 @@ require('lazy').setup({
 		end,
 	},
 
-	{   -- Plenary
+	{ -- Plenary
 		'nvim-lua/plenary.nvim',
 		lazy = true,
 	},
 
-	{   -- Tmux Navigator
+	{ -- Tmux Navigator
 		"christoomey/vim-tmux-navigator",
 		lazy = true,
 		cmd = {
@@ -45,7 +74,7 @@ require('lazy').setup({
 		end,
 	},
 
-	{   -- Render Markdown
+	{ -- Render Markdown
 		"MeanderingProgrammer/render-markdown.nvim",
 		ft = { "markdown" },
 		dependencies = {
@@ -57,12 +86,12 @@ require('lazy').setup({
 		end,
 	},
 
-	{   -- Lush (colorscheme builder)
+	{ -- Lush (colorscheme builder)
 		'rktjmp/lush.nvim',
 		lazy = true,
 	},
 
-	{   -- Zen Mode
+	{ -- Zen Mode
 		"folke/zen-mode.nvim",
 		cmd = "ZenMode",
 		opts = {
@@ -72,7 +101,7 @@ require('lazy').setup({
 		},
 	},
 
-	{   -- LSP Config
+	{ -- LSP Config
 		'neovim/nvim-lspconfig',
 		event = { "BufReadPre", "BufNewFile" },
 		config = function()
@@ -80,7 +109,7 @@ require('lazy').setup({
 		end,
 	},
 
-	{   -- Completion
+	{ -- Completion
 		"hrsh7th/nvim-cmp",
 		event = "InsertEnter",
 		keys = { "<leader>cc" },
@@ -94,17 +123,17 @@ require('lazy').setup({
 		end,
 	},
 
-	{   -- Mason
+	{ -- Mason
 		'williamboman/mason.nvim',
 		cmd = "Mason",
 	},
 
-	{   -- Mason LSP Config
+	{ -- Mason LSP Config
 		'williamboman/mason-lspconfig.nvim',
 		event = 'VeryLazy',
 	},
 
-	{   -- Oil
+	{ -- Oil
 		'stevearc/oil.nvim',
 		lazy = false,
 		dependancies = { 'nvim-tree/nvim-web-devicons' },
@@ -113,7 +142,7 @@ require('lazy').setup({
 		end,
 	},
 
-	{   -- Telescope
+	{ -- Telescope
 		"nvim-telescope/telescope.nvim",
 		lazy = false,
 		dependencies = {
@@ -131,7 +160,7 @@ require('lazy').setup({
 		end,
 	},
 
-	{   -- FTerm
+	{ -- FTerm
 		"numToStr/FTerm.nvim",
 		cmd = "FTermToggle",
 		lazy = false,
@@ -140,7 +169,7 @@ require('lazy').setup({
 		end,
 	},
 
-	{   -- Surround
+	{ -- Surround
 		"kylechui/nvim-surround",
 		event = "VeryLazy",
 		config = function()
@@ -148,7 +177,7 @@ require('lazy').setup({
 		end,
 	},
 
-	{   -- Autopairs
+	{ -- Autopairs
 		"windwp/nvim-autopairs",
 		event = "InsertEnter",
 		config = function()
@@ -156,7 +185,7 @@ require('lazy').setup({
 		end,
 	},
 
-	{   -- Align
+	{ -- Align
 		"rrethy/nvim-align",
 		cmd = "Align",
 		keys = { "ga", "gA" },
@@ -166,14 +195,14 @@ require('lazy').setup({
 	},
 
 	-- Local Repos ------------------------------------------
-	{   -- Yamicon
+	{ -- Yamicon
 		dir = "~/Development/yamicon",
 		config = function()
 			require('yamicon').setup({})
 		end,
 	},
 
-	{   -- Codex-Inline
+	{ -- Codex-Inline
 		dir = "~/Development/codex-inline",
 		config = function()
 			require('codex_inline').setup({
@@ -188,19 +217,22 @@ require('lazy').setup({
 			})
 		end,
 	},
-	{
+
+	{ -- Fold-Up
 		dir = "~/Development/fold-up",
 		config = function()
 			require("fold-up").setup({})
 		end,
 	},
-	{
+
+	{ -- Styla
 		dir = vim.fn.stdpath("config") .. "/local-plugins/styla.nvim",
 		config = function()
 			require("styla").setup()
 		end,
 	},
-	{
+
+	{ -- Discord Chat
 		dir = "~/Development/discord-chat.nvim",
 		config = function()
 			require('discord-chat').setup({
@@ -213,4 +245,49 @@ require('lazy').setup({
 			})
 		end,
 	},
+
+	{ -- Inactive Dimmer
+		dir = vim.fn.stdpath("config") .. "/local-plugins/inactive-dimmer",
+		name = "inactive-dimmer.nvim",
+		lazy = false,
+		config = function()
+			require("inactive_dimmer").setup({
+				dim_factor = 0.65,
+			})
+		end,
+	},
+
+	{ -- PDF Reader
+		dir = vim.fn.stdpath("config") .. "/local-plugins/pdf-reader.nvim",
+		name = "pdf-reader.nvim",
+		lazy = false,
+	},
+
+	{ -- Casket
+		dir = "~/Development/casket.nvim",
+		name = "casket.nvim",
+		lazy = false,
+		config = function()
+			require("casket").setup()
+		end,
+	},
+
+	{
+		dir = "~/Development/bug-chaser.nvim",
+		name = "bug-chaser.nvim",
+		lazy = true,
+		config = function()
+			require('bug_chaser').setup()
+		end,
+	},
+
+	{ -- Telescope-Diff
+		dir = "~/Development/telescope-diff",
+		dependancies = { "nvim-telescope/telescope.nvim" },
+		config = function()
+			require("telescope_diff").setup()
+			require("telescope").load_extension("telescope_diff")
+		end,
+	},
+
 })

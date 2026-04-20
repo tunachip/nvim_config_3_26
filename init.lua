@@ -1,7 +1,7 @@
+-- init.lua
+
 require('loader')
 require('plugins')
-require('theme_builder').setup()
-require('local_snippets').setup()
-require('setups').keymaps()
-require('setups').autocmds()
-require('setups').org_extensions()
+require('tmux_nav').setup()
+
+vim.keymap.set("x", "<leader>rr", ":BugChaserRun<cr>", { desc = "Run selected range" })

@@ -1,0 +1,166 @@
+defaults:
+  fg: "#aaffff"
+  bg: "#000000"
+
+pallette:
+  magenta: "#ff00ff"
+  pink: "#ffaaff"
+  lilac: "#aaaaff"
+
+  blue: "#0000ff"
+  royal-blue: "#0044ff"
+  light-blue: "#55aaff"
+  dark-blue: "#000055"
+  speed-green: "#005533"
+
+  light-gray: "#afafaf"
+  dark-gray: "#242424"
+
+highlights:
+  EndOfBuffer:
+    fg: lilac
+  Visual:
+    bg: dark-blue
+    underline
+  CursorLine:
+    bg: dark-gray
+  Comment:
+    fg: speed-green
+    italic
+  Constant:
+    fg: pink
+  Identifier:
+    fg: light-blue
+  Statement:
+    fg: light-blue
+    italic
+  PreProc:
+    fg: light-blue
+    italic
+  Type: light-blue
+  Special:
+    fg: pink
+    bold
+  String:
+    fg: light-gray
+  Number:
+    fg: speed-green
+  Keyword:
+    fg: royal-blue
+    italic
+  Delimiter: light-gray
+  Operator: light-gray
+  Title:
+    fg: speed-green
+    bold
+  LineNr:
+    fg: speed-green
+    bg: dark-gray
+  CursorLineNr:
+    fg: "#ffffff"
+    bg: dark-gray
+    bold
+  StatusLine:
+    fg: lilac
+    bg: dark-gray
+  StatusLineNC:
+    fg: light-gray
+    bg: dark-gray
+    italic
+  DiagnosticError:
+    bg: 550000
+    bold
+  DiagnosticWarn:
+    bg: 555500
+    bold
+  DiagnosticInfo:
+    bg: 000055
+    bold
+  DiagnosticHint:
+    bg: 005555
+    bold
+  DiagnosticOk:
+    bg: 005500
+    bold
+  DiagnosticUnderlineError:
+    sp: 550000
+    undercurl
+  DiagnosticUnderlineWarn:
+    sp: 555500
+    undercurl
+  DiagnosticUnderlineInfo:
+    sp: 000055
+    undercurl
+  DiagnosticUnderlineHint:
+    sp: 005555
+    undercurl
+  DiagnosticUnnecessary:
+    sp: 656b2f
+    italic
+    undercurl
+  DiagnosticVirtualLinesError:
+    bg: 550000
+  DiagnosticVirtualLinesWarn:
+    bg: 555500
+  DiagnosticVirtualLinesInfo:
+    bg: 000055
+  DiagnosticVirtualLinesHint:
+    bg: 005555
+  DiagnosticVirtualLinesOk:
+    bg: 005500
+  Directory:
+    fg: speed-green
+    italic
+
+captures:
+  @variable: f0ead6
+  @variable.parameter: f0ead6
+  @variable.member: 7aa035
+  @function: f0ead6
+  @function.call: f0ead6
+  @function.method.call: 7aa035
+  @function.python: f0ead6
+  @function.call.python: f0ead6
+  @method.python: f0ead6
+  @method.call.python: f0ead6
+  @type: d2c270
+  @type.builtin: d2c270
+  @type.python: d2c270
+  @type.builtin.python: d2c270
+  @keyword:
+    fg: f0ead6
+    italic
+  @keyword.function:
+    fg: aa5588
+    bold
+  @keyword.import:
+    fg: f0ead6
+    italic
+  @keyword.repeat:
+    fg: f0ead6
+    italic
+  @keyword.operator:
+    fg: f0ead6
+    italic
+  @keyword.conditional:
+    fg: f0ead6
+    italic
+  @keyword.return:
+    fg: f0ead6
+    italic
+  @operator: f0ead6
+  @punctuation.delimiter: f0ead6
+  @punctuation.bracket: 656b2f
+  @lsp.type.interface: d2c270
+  @lsp.type.type: d2c270
+  @lsp.type.class: d2c270
+  @lsp.type.function.typescript: f0ead6
+  @lsp.type.type.python: d2c270
+  @lsp.type.class.python: d2c270
+  @comment:
+    fg: aa5588
+    italic
+links:
+  Character: String
+  Boolean: Constant
+  Number: Constant

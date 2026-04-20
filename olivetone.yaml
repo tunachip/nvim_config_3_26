@@ -1,0 +1,171 @@
+defaults:
+  fg: "#f0ead6"
+  bg: "#000000"
+
+pallette:
+  wine: "#aa5588"
+  dark-wine: "#440044"
+  brown: "#656b2f"
+  gray: "#181818"
+
+highlights:
+  EndOfBuffer:
+    fg: brown
+  Visual:
+    bg: dark-wine
+    underline
+  CursorLine:
+    bg: gray
+  Comment:
+    fg: wine
+    italic
+  Constant:
+    fg: "#7aa035"
+  Identifier:
+    fg: "#f0ead6"
+  Statement:
+    fg: "#d2c270"
+    italic
+  PreProc:
+    fg: "#d2c270"
+    italic
+  Type: "#d2c270"
+  Special:
+    fg: "#d2c270"
+    bold
+  String:
+    fg: "#a2cd5a"
+  Function:
+    fg: "#f0ead6"
+  pythonFunction:
+    fg: "#f0ead6"
+  Keyword:
+    fg: "#f0ead6"
+    italic
+  Delimiter: f0ead6
+  Operator: f0ead6
+  Title:
+    fg: 6b8e23
+    bold
+  LineNr:
+    fg: 656b2f
+    bg: 181818
+  CursorLineNr:
+    fg: d2c270
+    bg: 181818
+    bold
+  StatusLine:
+    fg: '#6b8e23'
+    bg: 181818
+  StatusLineNC:
+    fg: 525252
+    bg: 181818
+    italic
+  DiagnosticError:
+    fg: f0ead6
+    bg: 550000
+    bold
+  DiagnosticWarn:
+    fg: f0ead6
+    bg: 555500
+    bold
+  DiagnosticInfo:
+    fg: f0ead6
+    bg: 000055
+    bold
+  DiagnosticHint:
+    fg: f0ead6
+    bg: 005555
+    bold
+  DiagnosticOk:
+    fg: f0ead6
+    bg: 005500
+    bold
+  DiagnosticUnderlineError:
+    sp: 550000
+    undercurl
+  DiagnosticUnderlineWarn:
+    sp: 555500
+    undercurl
+  DiagnosticUnderlineInfo:
+    sp: 000055
+    undercurl
+  DiagnosticUnderlineHint:
+    sp: 005555
+    undercurl
+  DiagnosticUnnecessary:
+    fg: f0ead6
+    sp: 656b2f
+    italic
+    undercurl
+  DiagnosticVirtualLinesError:
+    fg: ffffff
+    bg: 550000
+  DiagnosticVirtualLinesWarn:
+    fg: ffffff
+    bg: 555500
+  DiagnosticVirtualLinesInfo:
+    fg: ffffff
+    bg: 000055
+  DiagnosticVirtualLinesHint:
+    fg: ffffff
+    bg: 005555
+  DiagnosticVirtualLinesOk:
+    fg: ffffff
+    bg: 005500
+  Directory:
+    fg: d2c270
+    italic
+
+captures:
+  @variable: f0ead6
+  @variable.parameter: f0ead6
+  @variable.member: 7aa035
+  @function: f0ead6
+  @function.call: f0ead6
+  @function.method.call: 7aa035
+  @function.python: f0ead6
+  @function.call.python: f0ead6
+  @method.python: f0ead6
+  @method.call.python: f0ead6
+  @type: d2c270
+  @type.builtin: d2c270
+  @type.python: d2c270
+  @type.builtin.python: d2c270
+  @keyword:
+    fg: f0ead6
+    italic
+  @keyword.function:
+    fg: aa5588
+    bold
+  @keyword.import:
+    fg: f0ead6
+    italic
+  @keyword.repeat:
+    fg: f0ead6
+    italic
+  @keyword.operator:
+    fg: f0ead6
+    italic
+  @keyword.conditional:
+    fg: f0ead6
+    italic
+  @keyword.return:
+    fg: f0ead6
+    italic
+  @operator: f0ead6
+  @punctuation.delimiter: f0ead6
+  @punctuation.bracket: 656b2f
+  @lsp.type.interface: d2c270
+  @lsp.type.type: d2c270
+  @lsp.type.class: d2c270
+  @lsp.type.function.typescript: f0ead6
+  @lsp.type.type.python: d2c270
+  @lsp.type.class.python: d2c270
+  @comment:
+    fg: aa5588
+    italic
+links:
+  Character: String
+  Boolean: Constant
+  Number: Constant

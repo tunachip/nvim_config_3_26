@@ -4,63 +4,31 @@ options:
   tabstop: 2
   softtabstop: 2
   shiftwidth: 2
-  relativenumber
-  cursorline
   !wrap
-  autoindent
-  hlsearch
-  incsearch
-  smartcase
-  inccommand: split
-  !showmode
-
-# colorscheme: olivetone-dark
-
-ft-autocmds:
-  markdown:
-    options:
-      tabstop: 2
-      softtabstop: 2
-      shiftwidth: 2
-   #  colorscheme: naysayer
-  org:
-    options:
-      tabstop: 2
-      softtabstop: 2
-      shiftwidth: 2
-    # colorscheme: naysayer
-  python:
-    options:
-      tabstop: 4
-      softtabstop: 4
-      shiftwidth: 4
-  rust:
-    options:
-      tabstop: 4
-      softtabstop: 4
-      shiftwidth: 4
 
 commands:
-  RunProgram:
-    cmd: lua require('setups').run_program()
-  LaunchInBrowser:
-    cmd: lua require('setups').launch_in_browser()
+  Run:
+    cmd: BugChaserRun
+    desc: Run current buffer through bug-chaser
 
 keybinds:
+  # --- Telescope ---
   <leader>ff:
-    modes: nv
+    modes: n
     cmd: Telescope find_files
   <leader>fg:
-    modes: nv
+    modes: n
     cmd: Telescope live_grep
-  <leader>ss:
+  <leader>fb:
     modes: n
     cmd: Telescope buffers
+
+  # --- Oil ---
+  -:
+    modes: n
+    cmd: Oil
+
+  # --- Runner ---
   <leader>rr:
     modes: n
-    cmd: RunProgram
-  ^b:
-    modes: n
-    cmd: LaunchInBrowser
-  ^j:
-    cmd: FTermToggle
+    cmd: Run

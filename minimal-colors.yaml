@@ -1,0 +1,6 @@
+defaults:
+  fg: "#ffffff"
+  bg: "#000000"
+highlights:
+captures:
+links:

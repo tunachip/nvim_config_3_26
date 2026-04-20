@@ -1,150 +1,236 @@
-require('lazy').setup({
-	{ -- Modes
-		"mvllow/modes.nvim",
-		tag = "v0.2.1",
+require("lazy").setup({
+	{ -- yamicon
+		dir = "~/Development/yamicon",
 		config = function()
-			local function hl_hex(group, key)
-				local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = group, link = false })
-				local value = ok and hl and hl[key]
-				if type(value) ~= "number" then
-					return nil
-				end
-				return string.format("#%06x", value)
-			end
+			require("yamicon").setup({})
+		end,
+	},
 
-			local modes = require("modes")
-			local mode_utils = require("modes.utils")
-			local mode_colors = {
-				copy = "#f5c359",
-				delete = "#c75c6a",
-				insert = "#78ccc5",
-				visual = "#9745be",
-			}
-			local line_opacity = {
-				copy = 0.15,
-				delete = 0.15,
-				insert = 0.15,
-				visual = 1,
-			}
-
-			local function set_hl(name, spec)
-				vim.api.nvim_set_hl(0, name, spec)
-			end
-
-			local function refresh_modes_highlights()
-				mode_colors.visual = hl_hex("Visual", "bg") or hl_hex("Comment", "fg") or "#9745be"
-				local normal_bg = hl_hex("Normal", "bg") or "#000000"
-				local blended = {
-					copy = mode_utils.blend(mode_colors.copy, normal_bg, line_opacity.copy),
-					delete = mode_utils.blend(mode_colors.delete, normal_bg, line_opacity.delete),
-					insert = mode_utils.blend(mode_colors.insert, normal_bg, line_opacity.insert),
-					visual = mode_utils.blend(mode_colors.visual, normal_bg, line_opacity.visual),
-				}
-
-				set_hl("ModesCopy", { bg = mode_colors.copy })
-				set_hl("ModesDelete", { bg = mode_colors.delete })
-				set_hl("ModesInsert", { bg = mode_colors.insert })
-				set_hl("ModesVisual", { bg = mode_colors.visual })
-
-				set_hl("ModesCopyCursorLine", { bg = blended.copy })
-				set_hl("ModesCopyCursorLineNr", { bg = blended.copy })
-				set_hl("ModesCopyCursorLineSign", { bg = blended.copy })
-				set_hl("ModesCopyCursorLineFold", { bg = blended.copy })
-
-				set_hl("ModesDeleteCursorLine", { bg = blended.delete })
-				set_hl("ModesDeleteCursorLineNr", { bg = blended.delete })
-				set_hl("ModesDeleteCursorLineSign", { bg = blended.delete })
-				set_hl("ModesDeleteCursorLineFold", { bg = blended.delete })
-
-				set_hl("ModesInsertCursorLine", { bg = blended.insert })
-				set_hl("ModesInsertCursorLineNr", { bg = blended.insert })
-				set_hl("ModesInsertCursorLineSign", { bg = blended.insert })
-				set_hl("ModesInsertCursorLineFold", { bg = blended.insert })
-
-				set_hl("ModesVisualCursorLine", { bg = blended.visual })
-				set_hl("ModesVisualCursorLineNr", { bg = blended.visual })
-				set_hl("ModesVisualCursorLineSign", { bg = blended.visual })
-				set_hl("ModesVisualCursorLineFold", { bg = blended.visual })
-				set_hl("ModesVisualVisual", { bg = blended.visual })
-
-				set_hl("ModesInsertModeMsg", { fg = mode_colors.insert })
-				set_hl("ModesVisualModeMsg", { fg = mode_colors.visual })
-			end
-
-			modes.setup({
-				colors = mode_colors,
-				line_opacity = line_opacity,
-			})
-
-			vim.schedule(refresh_modes_highlights)
-			vim.api.nvim_create_autocmd({ "ColorScheme", "BufEnter", "VimEnter" }, {
-				group = vim.api.nvim_create_augroup("ModesRefreshAfterColorscheme", { clear = true }),
-				callback = vim.schedule_wrap(refresh_modes_highlights),
-				desc = "Rebuild modes.nvim highlights after runtime colorscheme resets",
+	{ -- oil
+		'steverarc/oil.nvim',
+		lazy = false,
+		dependancies = { 'nvim-tree/nvim-web-devicons' },
+		config = function()
+			require('oil').setup({
+				default_file_explorer = true,
+				skip_confirm_for_simple_edits = true,
+				view_options = { show_hidden = true },
+				columns = { "icon" },
+				preview = { vertical = true, splits = "botright" },
 			})
 		end
 	},
 
-	{ -- OrgMode
-		'nvim-orgmode/orgmode',
-		event = 'VeryLazy',
-		ft = { 'org ' },
-		config = function()
-			vim.lsp.enable('org')
-		end,
-	},
-
-	{ -- OrgmodeTelescope
-		'nvim-orgmode/telescope-orgmode.nvim',
-		event = "VeryLazy",
-		dependencies = {
-			'nvim-orgmode/orgmode',
-			'nvim-telescope/telescope.nvim',
-		},
-		config = function()
-			require("setups").orgmode_telescope()
-		end,
-	},
-
-	{
-		"hat0uma/csvview.nvim",
-		---@module "csvview"
-		---@type CsvView.Options
-		opts = {
-			parser = { comments = { "#", "//" } },
-			keymaps = {
-				textobject_field_inner = { "if", mode = { "o", "x" } },
-				textobject_field_outer = { "af", mode = { "o", "x" } },
-				jump_next_field_end = { "<Tab>", mode = { "n", "v" } },
-				jump_prev_field_end = { "<S-Tab>", mode = { "n", "v" } },
-				jump_next_row = { "<Enter>", mode = { "n", "v" } },
-				jump_prev_row = { "<S-Enter>", mode = { "n", "v" } },
-			},
-		},
-		cmd = { "CsvViewEnable", "CsvViewDisable", "CsvViewToggle" },
-	},
-
-	{ -- Treesitter
-		"nvim-treesitter/nvim-treesitter",
-		build = ":TSUpdate",
+	{ -- telescope
+		"nvim-telescope/telescope.nvim", version = "*",
 		lazy = false,
-		dependencies = { {
-			"windwp/nvim-ts-autotag",
-			config = function()
-				require('nvim-ts-autotag').setup()
-			end,
-		} },
+		dependencies = {
+			'nvim-lua/plenary.nvim',
+			{ 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' },
+		},
 		config = function()
-			require("setups").treesitter()
+			local telescope = require("telescope")
+			local action_state = require("telescope.actions.state")
+			local themes = require("telescope.themes")
+			local ivy_height = 0.5
+
+			local function toggle_ivy_fullscreen(prompt_bufnr)
+				local picker = action_state.get_current_picker(prompt_bufnr)
+				if not picker or picker.layout_strategy ~= "bottom_pane" then
+					return
+				end
+
+				picker.layout_config = picker.layout_config or {}
+				picker.layout_config.bottom_pane = picker.layout_config.bottom_pane or {}
+
+				local current_height = picker.layout_config.height
+				local is_fullscreen = type(current_height) == "table" and current_height.padding == 0
+				local new_height = is_fullscreen and ivy_height or { padding = 0 }
+
+				picker.layout_config.height = new_height
+				picker.layout_config.bottom_pane.height = new_height
+				picker:full_layout_update()
+			end
+
+			telescope.setup({
+				defaults = vim.tbl_deep_extend("force", themes.get_ivy({
+					layout_config = {
+						height = ivy_height,
+					},
+				}), {
+					mappings = {
+						i = {
+							["<C-f>"] = toggle_ivy_fullscreen,
+						},
+						n = {
+							["<C-f>"] = toggle_ivy_fullscreen,
+						},
+					},
+					path_display = { "smart" },
+					sorting_strategy = "ascending",
+				}),
+				extensions = {
+					fzf = {
+						fuzzy = true,
+						override_generic_sorter = true,
+						override_file_sorter = true,
+						case_mode = "smart_case",
+					},
+				},
+			})
+
+			pcall(telescope.load_extension, "fzf")
 		end,
 	},
 
-	{ -- Plenary
-		'nvim-lua/plenary.nvim',
-		lazy = true,
+	{ -- minischeme
+		dir = "~/Development/minischeme.nvim",
+		config = function()
+			require("minischeme").setup({
+				file = vim.fn.stdpath("config") .. "/olivetone.yaml",
+			})
+
+			-- Apply the startup minischeme once, but don't re-layer olivetone
+			-- over unrelated themes after an explicit :colorscheme change.
+			for _, autocmd in ipairs(vim.api.nvim_get_autocmds({ event = "ColorScheme" })) do
+				if autocmd.desc == "Reapply minischeme overrides after colorscheme changes" then
+					vim.api.nvim_del_autocmd(autocmd.id)
+				end
+			end
+		end,
 	},
 
-	{ -- Tmux Navigator
+	{ -- surround
+		"kylechui/nvim-surround",
+		event = "VeryLazy",
+		config = function()
+			require("nvim-surround").setup({
+				aliases = {
+					["q"] = { "'", '"', "`" },
+					["b"] = { ")", "]", "}" },
+				},
+				highlight = { duration = 0 },
+			})
+		end,
+	},
+
+	{ -- autopairs
+		"windwp/nvim-autopairs",
+		event = "InsertEnter",
+		config = function()
+			require("nvim-autopairs").setup({
+				disable_filetype = { "TelescopePrompt" },
+				enable_afterquote = true,
+				enable_check_bracket_line = true,
+			})
+			local rules, Rule = pcall(require, "nvim-autopairs.rule")
+			if not rules then return end
+			require("nvim-autopairs").add_rules({
+				Rule("__", "__", "python")
+				:with_pair(
+					function(opts)
+						local prev = opts.prev_char or ""
+						if prev:match("%w") then
+							return false
+						end
+						return true
+					end
+				)
+				:with_move(
+					function(opts)
+						return opts.next_char == "_"
+					end
+				)
+				:use_key("_"),
+			})
+		end,
+	},
+
+	{ -- align
+		"rrethy/nvim-align",
+		cmd = "Align",
+		keys = { "ga", "gA" },
+		config = function()
+			require("nvim-align").setup({
+				preview = true,
+				default_spacing = 1,
+				default_jit = false,
+				keymaps = { start = "ga", stop = "gA" },
+			})
+		end,
+	},
+
+	{ -- bug chaser
+		dir = "~/Development/bug-chaser.nvim",
+		config = function()
+			local function get_hl(name)
+				local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = name, link = false })
+				if not ok or not hl or vim.tbl_isempty(hl) then
+					return nil
+				end
+				return hl
+			end
+
+			local function first_hl(names)
+				for _, name in ipairs(names) do
+					local hl = get_hl(name)
+					if hl then
+						return hl
+					end
+				end
+			end
+
+			local function set_bug_chaser_highlights()
+				local normal = get_hl("Normal") or {}
+				local severities = {
+					Error = { "DiagnosticVirtualLinesError", "DiagnosticVirtualTextError", "DiagnosticError", "ErrorMsg" },
+					Warn = { "DiagnosticVirtualLinesWarn", "DiagnosticVirtualTextWarn", "DiagnosticWarn", "WarningMsg" },
+					Info = { "DiagnosticVirtualLinesInfo", "DiagnosticVirtualTextInfo", "DiagnosticInfo", "MoreMsg" },
+					Hint = { "DiagnosticVirtualLinesHint", "DiagnosticVirtualTextHint", "DiagnosticHint", "Question" },
+				}
+
+				for suffix, groups in pairs(severities) do
+					local source = first_hl(groups) or {}
+					local fg = source.fg or normal.fg
+					local bg = source.bg or normal.bg
+
+					vim.api.nvim_set_hl(0, "BugChaserDiagnosticVirtualLine" .. suffix, {
+						fg = fg,
+						bg = bg,
+						bold = source.bold,
+						italic = source.italic,
+						underline = source.underline,
+						undercurl = source.undercurl,
+					})
+					vim.api.nvim_set_hl(0, "BugChaserDiagnosticVirtualFill" .. suffix, {
+						fg = bg,
+						bg = bg,
+					})
+				end
+			end
+
+			require("bug_chaser").setup({
+				diagnostics = {
+					virtual_lines = {
+						enabled = true,
+					},
+				},
+				terminal = {
+					focus = true,
+					height = 12,
+				},
+			})
+			set_bug_chaser_highlights()
+			vim.api.nvim_create_autocmd("ColorScheme", {
+				group = vim.api.nvim_create_augroup(
+					"BugChaserThemeOverrides", { clear = true }
+				),
+				callback = set_bug_chaser_highlights,
+			})
+		end,
+	},
+
+	{ -- tmux navigator
 		"christoomey/vim-tmux-navigator",
 		lazy = true,
 		cmd = {
@@ -159,220 +245,14 @@ require('lazy').setup({
 		end,
 	},
 
-	{ -- Render Markdown
-		"MeanderingProgrammer/render-markdown.nvim",
-		ft = { "markdown" },
-		dependencies = {
-			"nvim-treesitter/nvim-treesitter",
-			"nvim-tree/nvim-web-devicons",
-		},
-		config = function()
-			require("setups").render_markdown()
-		end,
-	},
-
-	{ -- Lush (colorscheme builder)
-		'rktjmp/lush.nvim',
-		lazy = true,
-	},
-
-	{ -- Zen Mode
-		"folke/zen-mode.nvim",
-		cmd = "ZenMode",
-		opts = {
-			window = {
-				width = 0.65,
-			},
-		},
-	},
-
-	{ -- LSP Config
-		'neovim/nvim-lspconfig',
-		event = { "BufReadPre", "BufNewFile" },
-		config = function()
-			require("setups").lsp()
-		end,
-	},
-
-	{ -- Completion
-		"hrsh7th/nvim-cmp",
-		event = "InsertEnter",
-		keys = { "<leader>cc" },
-		dependencies = {
-			"hrsh7th/cmp-nvim-lsp",
-			"hrsh7th/cmp-buffer",
-			"hrsh7th/cmp-path",
-		},
-		config = function()
-			require("setups").cmp()
-		end,
-	},
-
-	{ -- Mason
-		'williamboman/mason.nvim',
+	{ -- mason
+		"williamboman/mason.nvim",
 		cmd = "Mason",
 	},
 
-	{ -- Mason LSP Config
-		'williamboman/mason-lspconfig.nvim',
-		event = 'VeryLazy',
-	},
-
-	{ -- Oil
-		'stevearc/oil.nvim',
-		lazy = false,
-		dependancies = { 'nvim-tree/nvim-web-devicons' },
-		config = function()
-			require('setups').oil()
-		end,
-	},
-
-	{ -- Telescope
-		"nvim-telescope/telescope.nvim",
-		lazy = false,
-		dependencies = {
-			"nvim-lua/plenary.nvim",
-			{
-				"nvim-telescope/telescope-fzf-native.nvim",
-				build = "make",
-				lazy = false,
-			},
-			"nvim-telescope/telescope-live-grep-args.nvim",
-			"nvim-telescope/telescope-symbols.nvim",
-		},
-		config = function()
-			require("setups").telescope()
-		end,
-	},
-
-	{ -- FTerm
-		"numToStr/FTerm.nvim",
-		cmd = "FTermToggle",
-		lazy = false,
-		config = function()
-			require('setups').fterm()
-		end,
-	},
-
-	{ -- Surround
-		"kylechui/nvim-surround",
+	{ -- mason lsp config
+		"williamboman/mason-lspconfig.nvim",
 		event = "VeryLazy",
-		config = function()
-			require("setups").surround()
-		end,
-	},
-
-	{ -- Autopairs
-		"windwp/nvim-autopairs",
-		event = "InsertEnter",
-		config = function()
-			require("setups").autopairs()
-		end,
-	},
-
-	{ -- Align
-		"rrethy/nvim-align",
-		cmd = "Align",
-		keys = { "ga", "gA" },
-		config = function()
-			require("setups").align()
-		end,
-	},
-
-	-- Local Repos ------------------------------------------
-	{ -- Yamicon
-		dir = "~/Development/yamicon",
-		config = function()
-			require('yamicon').setup({})
-		end,
-	},
-
-	{ -- Codex-Inline
-		dir = "~/Development/codex-inline",
-		config = function()
-			require('codex_inline').setup({
-				codex_exec_command = { "codex", "exec" },
-				codex_terminal_command = { "codex" },
-				skip_git_repo_check = true,
-				terminal = {
-					direction = "horizontal",
-					placement = "botright",
-					size = 15,
-				},
-			})
-		end,
-	},
-
-	{ -- Fold-Up
-		dir = "~/Development/fold-up",
-		config = function()
-			require("fold-up").setup({})
-		end,
-	},
-
-	{ -- Styla
-		dir = vim.fn.stdpath("config") .. "/local-plugins/styla.nvim",
-		config = function()
-			require("styla").setup()
-		end,
-	},
-
-	{ -- Discord Chat
-		dir = "~/Development/discord-chat.nvim",
-		config = function()
-			require('discord-chat').setup({
-				token = vim.env.DISCORD_BOT_TOKEN,
-				channel_id = "https://discord.com/channels/1447973083666448384/1484352669521809450",
-				mappings = {
-					toggle = "<leader>dc",
-					refresh = "<leader>dr",
-				},
-			})
-		end,
-	},
-
-	{ -- Inactive Dimmer
-		dir = vim.fn.stdpath("config") .. "/local-plugins/inactive-dimmer",
-		name = "inactive-dimmer.nvim",
-		lazy = false,
-		config = function()
-			require("inactive_dimmer").setup({
-				dim_factor = 0.65,
-			})
-		end,
-	},
-
-	{ -- PDF Reader
-		dir = vim.fn.stdpath("config") .. "/local-plugins/pdf-reader.nvim",
-		name = "pdf-reader.nvim",
-		lazy = false,
-	},
-
-	{ -- Casket
-		dir = "~/Development/casket.nvim",
-		name = "casket.nvim",
-		lazy = false,
-		config = function()
-			require("casket").setup()
-		end,
-	},
-
-	{
-		dir = "~/Development/bug-chaser.nvim",
-		name = "bug-chaser.nvim",
-		lazy = true,
-		config = function()
-			require('bug_chaser').setup()
-		end,
-	},
-
-	{ -- Telescope-Diff
-		dir = "~/Development/telescope-diff",
-		dependancies = { "nvim-telescope/telescope.nvim" },
-		config = function()
-			require("telescope_diff").setup()
-			require("telescope").load_extension("telescope_diff")
-		end,
 	},
 
 })

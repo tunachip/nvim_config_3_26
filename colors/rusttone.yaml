@@ -1,0 +1,175 @@
+defaults:
+  bg: "#000000"
+
+pallette:
+  rust:       "#EF5F1F"
+  beige:      "#EDE8D0"
+  sponge:     "#B7960E"
+  dark-rust:  "#6D2708"
+  pink:       "#D26D81"
+  light-pink: "#DE94A3"
+  dark-wine:  "#440044"
+  gray:       "#202020"
+  light-gray: "#555555"
+
+highlights:
+  EndOfBuffer:
+    fg: dark-rust
+  Visual:
+    bg: dark-rust
+    underline
+  CursorLine:
+    bg: gray
+  Comment:
+    fg: rust
+    italic
+  Constant:
+    fg: pink
+  Identifier:
+    fg: beige
+  Statement:
+    fg: sponge
+    italic
+  PreProc:
+    fg: sponge
+    italic
+  Type: sponge
+  Special:
+    fg: sponge
+    bold
+  String:
+    fg: light-pink
+  Function:
+    fg: beige
+  pythonFunction:
+    fg: beige
+  Keyword:
+    fg: beige
+    italic
+  Delimiter: 
+    fg: beige
+  Operator:
+    fg: beige
+  Title:
+    fg: rust
+    bold
+  LineNr:
+    fg: light-gray
+  CursorLineNr:
+    fg: sponge
+    bold
+  StatusLine:
+    fg: light-pink
+    bg: gray
+  StatusLineNC:
+    fg: "#525252"
+    bg: gray
+    italic
+  DiagnosticError:
+    fg: beige
+    bg: "#550000"
+    bold
+  DiagnosticWarn:
+    fg: beige
+    bg: "#555500"
+    bold
+  DiagnosticInfo:
+    fg: beige
+    bg: "#000055"
+    bold
+  DiagnosticHint:
+    fg: beige
+    bg: "#005555"
+    bold
+  DiagnosticOk:
+    fg: beige
+    bg: "#005500"
+    bold
+  DiagnosticUnderlineError:
+    sp: "#550000"
+    undercurl
+  DiagnosticUnderlineWarn:
+    sp: "#555500"
+    undercurl
+  DiagnosticUnderlineInfo:
+    sp: "#000055"
+    undercurl
+  DiagnosticUnderlineHint:
+    sp: "#005555"
+    undercurl
+  DiagnosticUnnecessary:
+    fg: beige
+    sp: "#656b2f"
+    italic
+    undercurl
+  DiagnosticVirtualLinesError:
+    fg: white
+    bg: "#550000"
+  DiagnosticVirtualLinesWarn:
+    fg: white
+    bg: "#555500"
+  DiagnosticVirtualLinesInfo:
+    fg: white
+    bg: "#000055"
+  DiagnosticVirtualLinesHint:
+    fg: white
+    bg: "#005555"
+  DiagnosticVirtualLinesOk:
+    fg: white
+    bg: "#005500"
+  Directory:
+    fg: sponge
+    italic
+
+captures:
+  @variable: beige
+  @variable.parameter: beige
+  @variable.member: rust
+  @function: beige
+  @function.call: beige
+  @function.method.call: rust
+  @function.python: beige
+  @function.call.python: beige
+  @method.python: beige
+  @method.call.python: beige
+  @type: sponge
+  @type.builtin: sponge
+  @type.python: sponge
+  @type.builtin.python: sponge
+  @keyword:
+    fg: beige
+    italic
+  @keyword.function:
+    fg: rust
+    bold
+  @keyword.import:
+    fg: beige
+    italic
+  @keyword.repeat:
+    fg: beige
+    italic
+  @keyword.operator:
+    fg: beige
+    italic
+  @keyword.conditional:
+    fg: beige
+    italic
+  @keyword.return:
+    fg: beige
+    italic
+  @operator: beige
+  @punctuation.delimiter: beige
+  @punctuation.bracket: dark-rust
+  @lsp.type.interface: sponge
+  @lsp.type.type: sponge
+  @lsp.type.class: sponge
+  @lsp.type.function.typescript: beige
+  @lsp.type.type.python: sponge
+  @lsp.type.class.python: sponge
+  @comment:
+    fg: rust
+    italic
+links:
+  Character: String
+  Boolean: Constant
+  Number: Constant

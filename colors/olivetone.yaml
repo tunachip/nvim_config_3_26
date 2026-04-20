@@ -1,0 +1,174 @@
+defaults:
+  bg: "#000000"
+
+pallette:
+  wine:       "#AA5588"
+  dark-wine:  "#440044"
+  olive:      "#656B2F"
+  deep-green: "#6B8E23"
+  lime:       "#A2CD5A"
+  gray:       "#202020"
+  gold:       "#D2C270"
+  ivory:      "#F0EAD6"
+
+highlights:
+  EndOfBuffer:
+    fg: olive
+  Visual:
+    bg: dark-wine
+    underline
+  CursorLine:
+    bg: gray
+  Comment:
+    fg: wine
+    italic
+  Constant:
+    fg: deep-green
+  Identifier:
+    fg: ivory
+  Statement:
+    fg: gold
+    italic
+  PreProc:
+    fg: gold
+    italic
+  Type: gold
+  Special:
+    fg: gold
+    bold
+  String:
+    fg: lime
+  Function:
+    fg: ivory
+  pythonFunction:
+    fg: ivory
+  Keyword:
+    fg: ivory
+    italic
+  Delimiter: 
+    fg: ivory
+  Operator:
+    fg: ivory
+  Title:
+    fg: deep-green
+    bold
+  LineNr:
+    fg: olive
+  CursorLineNr:
+    fg: lime
+    bold
+  StatusLine:
+    fg: '#6b8e23'
+    bg: "#181818"
+  StatusLineNC:
+    fg: "#525252"
+    bg: "#181818"
+    italic
+  DiagnosticError:
+    fg: ivory
+    bg: "#550000"
+    bold
+  DiagnosticWarn:
+    fg: ivory
+    bg: "#555500"
+    bold
+  DiagnosticInfo:
+    fg: ivory
+    bg: "#000055"
+    bold
+  DiagnosticHint:
+    fg: ivory
+    bg: "#005555"
+    bold
+  DiagnosticOk:
+    fg: ivory
+    bg: "#005500"
+    bold
+  DiagnosticUnderlineError:
+    sp: "#550000"
+    undercurl
+  DiagnosticUnderlineWarn:
+    sp: "#555500"
+    undercurl
+  DiagnosticUnderlineInfo:
+    sp: "#000055"
+    undercurl
+  DiagnosticUnderlineHint:
+    sp: "#005555"
+    undercurl
+  DiagnosticUnnecessary:
+    fg: ivory
+    sp: "#656b2f"
+    italic
+    undercurl
+  DiagnosticVirtualLinesError:
+    fg: white
+    bg: "#550000"
+  DiagnosticVirtualLinesWarn:
+    fg: white
+    bg: "#555500"
+  DiagnosticVirtualLinesInfo:
+    fg: white
+    bg: "#000055"
+  DiagnosticVirtualLinesHint:
+    fg: white
+    bg: "#005555"
+  DiagnosticVirtualLinesOk:
+    fg: white
+    bg: "#005500"
+  Directory:
+    fg: gold
+    italic
+
+captures:
+  @variable: ivory
+  @variable.parameter: ivory
+  @variable.member: deep-green
+  @function: ivory
+  @function.call: ivory
+  @function.method.call: green
+  @function.python: ivory
+  @function.call.python: ivory
+  @method.python: ivory
+  @method.call.python: ivory
+  @type: gold
+  @type.builtin: gold
+  @type.python: gold
+  @type.builtin.python: gold
+  @keyword:
+    fg: ivory
+    italic
+  @keyword.function:
+    fg: wine
+    bold
+  @keyword.import:
+    fg: ivory
+    italic
+  @keyword.repeat:
+    fg: ivory
+    italic
+  @keyword.operator:
+    fg: ivory
+    italic
+  @keyword.conditional:
+    fg: ivory
+    italic
+  @keyword.return:
+    fg: ivory
+    italic
+  @operator: ivory
+  @punctuation.delimiter: ivory
+  @punctuation.bracket: olive
+  @lsp.type.interface: gold
+  @lsp.type.type: gold
+  @lsp.type.class: gold
+  @lsp.type.function.typescript: ivory
+  @lsp.type.type.python: gold
+  @lsp.type.class.python: gold
+  @comment:
+    fg: wine
+    italic
+links:
+  Character: String
+  Boolean: Constant
+  Number: Constant

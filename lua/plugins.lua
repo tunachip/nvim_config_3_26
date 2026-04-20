@@ -1,3 +1,5 @@
+local vim = vim
+
 require("lazy").setup({
 	{ -- yamicon
 		dir = "~/Development/yamicon",
@@ -17,6 +19,10 @@ require("lazy").setup({
 				view_options = { show_hidden = true },
 				columns = { "icon" },
 				preview = { vertical = true, splits = "botright" },
+				keymaps = {
+					["<C-h>"] = false,
+					["<C-s>"] = false,
+				},
 			})
 		end
 	},
@@ -83,15 +89,18 @@ require("lazy").setup({
 		end,
 	},
 
+	{ -- gitsigns
+		"lewis6991/gitsigns.nvim",
+		config = function()
+			require("gitsigns").setup()
+		end,
+	},
+
 	{ -- minischeme
 		dir = "~/Development/minischeme.nvim",
 		config = function()
-			require("minischeme").setup({
-				file = vim.fn.stdpath("config") .. "/olivetone.yaml",
-			})
+			require("minischeme").setup()
 
-			-- Apply the startup minischeme once, but don't re-layer olivetone
-			-- over unrelated themes after an explicit :colorscheme change.
 			for _, autocmd in ipairs(vim.api.nvim_get_autocmds({ event = "ColorScheme" })) do
 				if autocmd.desc == "Reapply minischeme overrides after colorscheme changes" then
 					vim.api.nvim_del_autocmd(autocmd.id)
@@ -248,11 +257,21 @@ require("lazy").setup({
 	{ -- mason
 		"williamboman/mason.nvim",
 		cmd = "Mason",
+		opts = {},
 	},
 
 	{ -- mason lsp config
 		"williamboman/mason-lspconfig.nvim",
-		event = "VeryLazy",
+		dependencies = {
+			"williamboman/mason.nvim",
+			"neovim/nvim-lspconfig",
+		},
+		event = { "BufReadPre", "BufNewFile" },
+		config = function()
+			require("mason-lspconfig").setup({
+				automatic_enable = true,
+			})
+		end,
 	},
 
 })

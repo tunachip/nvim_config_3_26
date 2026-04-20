@@ -1,3 +1,6 @@
+colorscheme:
+  clean-dark
+
 options:
   mapleader: ' '
   maplocalleader: ' '
@@ -5,6 +8,38 @@ options:
   softtabstop: 2
   shiftwidth: 2
   !wrap
+  cursorline
+
+ft-autocmds:
+  python:
+    options:
+      shiftwidth: 4
+      tabstop: 4
+      softtabstop: 4
+    colorscheme:
+      theme: olivetone
+  oil:
+    colorscheme:
+      theme: clean-dark
+  javascript:
+    colorscheme:
+      theme: olivetone
+  typescript:
+    match: javascript
+  rust:
+    options:
+      shiftwidth: 4
+      tabstop: 4
+      softtabstop: 4
+    colorscheme:
+      theme: rusttone
+  yaml:
+    match: oil
+  lua:
+    colorscheme:
+      theme: default
+      Normal:
+        bg: "#000000"
 
 commands:
   Run:
@@ -12,7 +47,15 @@ commands:
     desc: Run current buffer through bug-chaser
 
 keybinds:
-  # --- Telescope ---
+  # === Global ===
+  ^n:
+    modes: niv
+    cmd: lua if vim.o.number then vim.cmd("set nonu nornu") else vim.cmd("set nu rnu") end
+  ^g:
+    modes: niv
+    cmd: Gitsigns toggle_signs
+
+  # === Telescope ===
   <leader>ff:
     modes: n
     cmd: Telescope find_files
@@ -23,12 +66,26 @@ keybinds:
     modes: n
     cmd: Telescope buffers
 
-  # --- Oil ---
+  # === Oil ===
   -:
     modes: n
     cmd: Oil
+  _:
+    modes: n
+    cmd: vsplit | Oil
+  ^v:
+    modes: n
+    buffertypes: Oil
+    cmd: lua require("oil.actions").select.callback({ vertical = true })
+  ^x:
+    modes: n
+    buffertypes: Oil
+    cmd: lua require("oil.actions").select.callback({ horizontal = true })
 
   # --- Runner ---
   <leader>rr:
     modes: n
-    cmd: Run
+    cmd: BugChaserRun
+  <leader>vv:
+    modes: niv
+    cmd: BugChaserToggleDiagnosticVirtualLines

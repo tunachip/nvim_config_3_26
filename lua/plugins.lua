@@ -1,15 +1,36 @@
 local vim = vim
 
 require("lazy").setup({
-	{ -- yamicon
-		dir = "~/Development/yamicon",
-		config = function()
-			require("yamicon").setup({})
-		end,
+	{ -- treesitter
+		"nvim-treesitter/nvim-treesitter",
+		lazy = false,
+		build = ":TSUpdate",
+	},
+
+	{
+		"epwalsh/obsidian.nvim",
+		version = "*",
+		lazy = true,
+		ft = "markdown",
+		dependencies = {
+			"nvim-lua/plenary.nvim",
+		},
+		opts = {
+			workspaces = {
+				{
+					name = "personal",
+					path = "~/vaults/personal",
+				},
+				{
+					name = "work",
+					path = "~/vaults/work",
+				},
+			},
+		},
 	},
 
 	{ -- oil
-		'steverarc/oil.nvim',
+		'tunachip/oil.nvim',
 		lazy = false,
 		dependancies = { 'nvim-tree/nvim-web-devicons' },
 		config = function()
@@ -27,12 +48,38 @@ require("lazy").setup({
 		end
 	},
 
+	{
+		'stevearc/conform.nvim',
+		opts = {},
+		config = function()
+			vim.api.nvim_create_user_command("Format", function(args)
+				local range = nil
+				if args.count ~= -1 then
+					local end_line = vim.api.nvim_buf_get_lines(0, args.line2 - 1, args.line2, true)[1]
+					range = { start = { args.line1, 0 }, ["end"] = { args.line2, end_line:len() } }
+				end
+				require("conform").format({ async = true, lsp_format = "fallback", range = range })
+			end, { range = true })
+		end,
+	},
+
+	{
+		"brenton-leighton/multiple-cursors.nvim",
+		version = "*",
+		opts = {},
+	},
+
 	{ -- telescope
-		"nvim-telescope/telescope.nvim", version = "*",
+		"nvim-telescope/telescope.nvim",
+		version = "*",
 		lazy = false,
 		dependencies = {
 			'nvim-lua/plenary.nvim',
+			'nvim-lua/popup.nvim',
 			{ 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' },
+			{ 'nvim-telescope/telescope-github.nvim' },
+			{ 'nvim-telescope/telescope-media-files.nvim' },
+			{ 'nvim-telescope/telescope-symbols.nvim' },
 		},
 		config = function()
 			local telescope = require("telescope")
@@ -82,6 +129,10 @@ require("lazy").setup({
 						override_file_sorter = true,
 						case_mode = "smart_case",
 					},
+					media_files = {
+						filetypes = { "png", "webp", "jpg", "jpeg", },
+						find_cmd = "rg",
+					},
 				},
 			})
 
@@ -96,13 +147,24 @@ require("lazy").setup({
 		end,
 	},
 
+	{
+		"tunachip/fold-up.nvim",
+		config = function()
+			require("fold-up").setup({
+				fold_command = "Fold",
+				unfold_command = "Unfold",
+			})
+		end,
+	},
+
 	{ -- minischeme
 		dir = "~/Development/minischeme.nvim",
+		priority = 1000,
 		config = function()
 			require("minischeme").setup()
 
 			for _, autocmd in ipairs(vim.api.nvim_get_autocmds({ event = "ColorScheme" })) do
-				if autocmd.desc == "Reapply minischeme overrides after colorscheme changes" then
+				if autocmd.desc == "Reapply the active minischeme after base colorscheme changes" then
 					vim.api.nvim_del_autocmd(autocmd.id)
 				end
 			end
@@ -136,21 +198,21 @@ require("lazy").setup({
 			if not rules then return end
 			require("nvim-autopairs").add_rules({
 				Rule("__", "__", "python")
-				:with_pair(
-					function(opts)
-						local prev = opts.prev_char or ""
-						if prev:match("%w") then
-							return false
-						end
-						return true
-					end
-				)
-				:with_move(
-					function(opts)
-						return opts.next_char == "_"
-					end
-				)
-				:use_key("_"),
+						:with_pair(
+							function(opts)
+								local prev = opts.prev_char or ""
+								if prev:match("%w") then
+									return false
+								end
+								return true
+							end
+						)
+						:with_move(
+							function(opts)
+								return opts.next_char == "_"
+							end
+						)
+						:use_key("_"),
 			})
 		end,
 	},
@@ -166,6 +228,14 @@ require("lazy").setup({
 				default_jit = false,
 				keymaps = { start = "ga", stop = "gA" },
 			})
+		end,
+	},
+
+	{ -- yamicon
+		dir = "~/Development/yamicon",
+		priority = 900,
+		config = function()
+			require("yamicon").setup({})
 		end,
 	},
 
@@ -192,10 +262,30 @@ require("lazy").setup({
 			local function set_bug_chaser_highlights()
 				local normal = get_hl("Normal") or {}
 				local severities = {
-					Error = { "DiagnosticVirtualLinesError", "DiagnosticVirtualTextError", "DiagnosticError", "ErrorMsg" },
-					Warn = { "DiagnosticVirtualLinesWarn", "DiagnosticVirtualTextWarn", "DiagnosticWarn", "WarningMsg" },
-					Info = { "DiagnosticVirtualLinesInfo", "DiagnosticVirtualTextInfo", "DiagnosticInfo", "MoreMsg" },
-					Hint = { "DiagnosticVirtualLinesHint", "DiagnosticVirtualTextHint", "DiagnosticHint", "Question" },
+					Error = {
+						"DiagnosticVirtualLinesError",
+						"DiagnosticVirtualTextError",
+						"DiagnosticError",
+						"ErrorMsg"
+					},
+					Warn = {
+						"DiagnosticVirtualLinesWarn",
+						"DiagnosticVirtualTextWarn",
+						"DiagnosticWarn",
+						"WarningMsg"
+					},
+					Info = {
+						"DiagnosticVirtualLinesInfo",
+						"DiagnosticVirtualTextInfo",
+						"DiagnosticInfo",
+						"MoreMsg"
+					},
+					Hint = {
+						"DiagnosticVirtualLinesHint",
+						"DiagnosticVirtualTextHint",
+						"DiagnosticHint",
+						"Question"
+					},
 				}
 
 				for suffix, groups in pairs(severities) do
@@ -219,22 +309,29 @@ require("lazy").setup({
 			end
 
 			require("bug_chaser").setup({
-				diagnostics = {
-					virtual_lines = {
-						enabled = true,
-					},
-				},
-				terminal = {
-					focus = true,
-					height = 12,
-				},
+				diagnostics = { virtual_lines = { enabled = true, } },
+				terminal = { focus = true, height = 0.75 },
 			})
 			set_bug_chaser_highlights()
 			vim.api.nvim_create_autocmd("ColorScheme", {
-				group = vim.api.nvim_create_augroup(
-					"BugChaserThemeOverrides", { clear = true }
-				),
+				group = vim.api.nvim_create_augroup("BugChaserThemeOverrides", { clear = true }),
 				callback = set_bug_chaser_highlights,
+			})
+		end,
+	},
+
+	{ -- casket
+		dir = "~/Development/casket.nvim",
+		config = function()
+			require("casket").setup({
+				auto = {
+					enabled = false,
+					mode = "repair",
+					events = { 'BufWritePre' },
+				},
+				profiles = {
+					lua = { variable = 'camelCase' },
+				},
 			})
 		end,
 	},
@@ -251,6 +348,18 @@ require("lazy").setup({
 		},
 		init = function()
 			vim.g.tmux_navigator_no_mappings = 1
+		end,
+	},
+
+	{ -- open
+		dir = "~/Development/open.nvim",
+		config = function()
+			require("open").setup({
+				launch = {
+					default_mode = "auto",
+					port = 8123,
+				},
+			})
 		end,
 	},
 

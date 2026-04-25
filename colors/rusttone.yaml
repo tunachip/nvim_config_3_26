@@ -79,7 +79,7 @@ highlights:
     bold
   DiagnosticHint:
     fg: beige
-    bg: "#005555"
+    bg: "#555500"
     bold
   DiagnosticOk:
     fg: beige
@@ -113,13 +113,15 @@ highlights:
     bg: "#000055"
   DiagnosticVirtualLinesHint:
     fg: white
-    bg: "#005555"
+    bg: "#555500"
   DiagnosticVirtualLinesOk:
     fg: white
     bg: "#005500"
   Directory:
     fg: sponge
     italic
+  SignColumn:
+    bg: gray
 
 captures:
   @variable: beige

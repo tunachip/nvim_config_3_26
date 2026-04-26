@@ -29,6 +29,11 @@ require("lazy").setup({
 		},
 	},
 
+	{ -- icons
+		"nvim-tree/nvim-web-devicons",
+		opts = {}
+	},
+
 	{ -- oil
 		'tunachip/oil.nvim',
 		lazy = false,
@@ -243,7 +248,10 @@ require("lazy").setup({
 		dir = "~/Development/bug-chaser.nvim",
 		config = function()
 			local function get_hl(name)
-				local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = name, link = false })
+				local ok, hl = pcall(
+					vim.api.nvim_get_hl, 0,
+					{ name = name, link = false }
+				)
 				if not ok or not hl or vim.tbl_isempty(hl) then
 					return nil
 				end
@@ -310,11 +318,14 @@ require("lazy").setup({
 
 			require("bug_chaser").setup({
 				diagnostics = { virtual_lines = { enabled = true, } },
-				terminal = { focus = true, height = 0.75 },
+				terminal = { focus = true, height = 0.50 },
+				summary = { enabled = false },
 			})
 			set_bug_chaser_highlights()
 			vim.api.nvim_create_autocmd("ColorScheme", {
-				group = vim.api.nvim_create_augroup("BugChaserThemeOverrides", { clear = true }),
+				group = vim.api.nvim_create_augroup(
+					"BugChaserThemeOverrides", { clear = true }
+				),
 				callback = set_bug_chaser_highlights,
 			})
 		end,
@@ -381,6 +392,16 @@ require("lazy").setup({
 				automatic_enable = true,
 			})
 		end,
+	},
+	{
+		"iamcco/markdown-preview.nvim",
+		cmd = {
+		  "MarkdownPreviewToggle",
+		  "MarkdownPreview",
+		  "MarkdownPreviewStop"
+		},
+		ft = { "markdown" },
+		build = function() vim.fn["mkdp#util#install"]() end,
 	},
 
 })

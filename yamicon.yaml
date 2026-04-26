@@ -27,6 +27,11 @@ ft-autocmds:
       theme: olivetone
   typescript:
     match: javascript
+  c:
+    match: javascript
+  cpp:
+    match: javascript
+
   rust:
     options:
       shiftwidth: 4

@@ -396,12 +396,166 @@ require("lazy").setup({
 	{
 		"iamcco/markdown-preview.nvim",
 		cmd = {
-		  "MarkdownPreviewToggle",
-		  "MarkdownPreview",
-		  "MarkdownPreviewStop"
+			"MarkdownPreviewToggle",
+			"MarkdownPreview",
+			"MarkdownPreviewStop",
 		},
 		ft = { "markdown" },
-		build = function() vim.fn["mkdp#util#install"]() end,
+		build = "cd app && ./install.sh",
+		init = function()
+			local css_dir = vim.fn.stdpath("cache") .. "/markdown-preview.nvim"
+			vim.g.mkdp_markdown_css = css_dir .. "/colorscheme.css"
+			vim.g.mkdp_highlight_css = css_dir .. "/highlight.css"
+			vim.g.mkdp_theme = vim.o.background == "light" and "light" or "dark"
+		end,
+		config = function()
+			local css_dir = vim.fn.stdpath("cache") .. "/markdown-preview.nvim"
+			local markdown_css = css_dir .. "/colorscheme.css"
+			local highlight_css = css_dir .. "/highlight.css"
+
+			local function current_hl_namespace()
+				if vim.api.nvim_win_get_hl_ns == nil then
+					return 0
+				end
+
+				local ok, ns = pcall(vim.api.nvim_win_get_hl_ns, 0)
+				if ok and type(ns) == "number" and ns >= 0 then
+					return ns
+				end
+
+				return 0
+			end
+
+			local function get_hl(name)
+				local ok, hl = pcall(
+					vim.api.nvim_get_hl,
+					current_hl_namespace(),
+					{ name = name, link = false }
+				)
+				if not ok or not hl or vim.tbl_isempty(hl) then
+					ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = name, link = false })
+				end
+				if not ok or not hl or vim.tbl_isempty(hl) then
+					return {}
+				end
+				return hl
+			end
+
+			local function color(value, fallback)
+				if type(value) ~= "number" then
+					return fallback
+				end
+				return ("#%06x"):format(value)
+			end
+
+			local function first_color(groups, key, fallback)
+				for _, group in ipairs(groups) do
+					local hl = get_hl(group)
+					if type(hl[key]) == "number" then
+						return color(hl[key], fallback)
+					end
+				end
+				return fallback
+			end
+
+			local function write_preview_css()
+				local normal = get_hl("Normal")
+				local bg = color(normal.bg, "#000000")
+				local fg = color(normal.fg, "#ffffff")
+				local muted = first_color({ "Comment", "LineNr" }, "fg", fg)
+				local accent = first_color({ "Title", "Statement", "Special" }, "fg", fg)
+				local link = first_color({ "Underlined", "Directory", "String" }, "fg", accent)
+				local border = first_color({ "LineNr", "FloatBorder" }, "fg", muted)
+				local code_bg = first_color({ "CursorLine", "NormalFloat", "SignColumn" }, "bg", bg)
+				local selection = first_color({ "Visual" }, "bg", code_bg)
+				local string = first_color({ "String" }, "fg", fg)
+				local constant = first_color({ "Constant", "Number" }, "fg", fg)
+				local keyword = first_color({ "Keyword", "Statement" }, "fg", fg)
+				local type_color = first_color({ "Type" }, "fg", fg)
+				local func = first_color({ "Function", "Identifier" }, "fg", fg)
+				local color_scheme = vim.o.background == "light" and "light" or "dark"
+
+				vim.fn.mkdir(css_dir, "p")
+				vim.fn.writefile({
+					":root {",
+					("  color-scheme: %s;"):format(color_scheme),
+					("  --mkdp-bg: %s;"):format(bg),
+					("  --mkdp-fg: %s;"):format(fg),
+					("  --mkdp-muted: %s;"):format(muted),
+					("  --mkdp-accent: %s;"):format(accent),
+					("  --mkdp-link: %s;"):format(link),
+					("  --mkdp-border: %s;"):format(border),
+					("  --mkdp-code-bg: %s;"):format(code_bg),
+					("  --mkdp-selection: %s;"):format(selection),
+					"}",
+					"",
+					"html, body, main, #page-ctn, .markdown-body {",
+					"  background: var(--mkdp-bg) !important;",
+					"  color: var(--mkdp-fg) !important;",
+					"}",
+					"",
+					".markdown-body a, .markdown-body a code { color: var(--mkdp-link) !important; }",
+					".markdown-body h1, .markdown-body h2, .markdown-body h3,",
+					".markdown-body h4, .markdown-body h5, .markdown-body h6 {",
+					"  color: var(--mkdp-accent) !important;",
+					"  border-bottom-color: var(--mkdp-border) !important;",
+					"}",
+					"",
+					".markdown-body blockquote {",
+					"  color: var(--mkdp-muted) !important;",
+					"  border-left-color: var(--mkdp-border) !important;",
+					"}",
+					"",
+					".markdown-body code, .markdown-body pre, .markdown-body pre code,",
+					".markdown-body table tr, .markdown-body table tr:nth-child(2n),",
+					".markdown-body table th, .markdown-body table td {",
+					"  background: var(--mkdp-code-bg) !important;",
+					"  color: var(--mkdp-fg) !important;",
+					"  border-color: var(--mkdp-border) !important;",
+					"}",
+					"",
+					".markdown-body hr { background-color: var(--mkdp-border) !important; }",
+					".markdown-body ::selection { background: var(--mkdp-selection) !important; }",
+				}, markdown_css)
+
+				vim.fn.writefile({
+					(".hljs { background: %s !important; color: %s !important; }"):format(code_bg, fg),
+					(".hljs-comment, .hljs-quote { color: %s !important; font-style: italic; }"):format(muted),
+					(".hljs-keyword, .hljs-selector-tag, .hljs-subst { color: %s !important; }"):format(keyword),
+					(".hljs-string, .hljs-doctag { color: %s !important; }"):format(string),
+					(".hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable, .hljs-attribute { color: %s !important; }"):format(constant),
+					(".hljs-title, .hljs-section, .hljs-selector-id { color: %s !important; font-weight: bold; }"):format(accent),
+					(".hljs-type, .hljs-class .hljs-title { color: %s !important; }"):format(type_color),
+					(".hljs-function, .hljs-name { color: %s !important; }"):format(func),
+					(".hljs-symbol, .hljs-bullet, .hljs-link { color: %s !important; }"):format(link),
+				}, highlight_css)
+
+				vim.g.mkdp_markdown_css = markdown_css
+				vim.g.mkdp_highlight_css = highlight_css
+				vim.g.mkdp_theme = vim.o.background == "light" and "light" or "dark"
+			end
+
+			write_preview_css()
+			vim.schedule(function()
+				if vim.bo.filetype == "markdown" then
+					write_preview_css()
+				end
+			end)
+
+			vim.api.nvim_create_autocmd({ "ColorScheme", "FileType", "WinEnter" }, {
+				group = vim.api.nvim_create_augroup("markdown_preview_colorscheme_css", { clear = true }),
+				pattern = "*",
+				callback = function(args)
+					if args.event == "FileType" and vim.bo[args.buf].filetype ~= "markdown" then
+						return
+					end
+					if vim.bo.filetype == "markdown" then
+						write_preview_css()
+					end
+				end,
+				desc = "Update MarkdownPreview CSS from the active markdown colorscheme",
+			})
+		end,
 	},
 
 })
